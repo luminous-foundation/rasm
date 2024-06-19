@@ -1,0 +1,7 @@
+FF main FE
+    05 text
+    06 io.print
+FD
+
+FC
+text C5 01 0D Hello, World!

@@ -1,0 +1,7 @@
+void main() {
+    LDARG text
+    CALL io.print
+}
+
+.data
+text char* "Hello, World!"
