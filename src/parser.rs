@@ -3,29 +3,153 @@ use std::collections::HashMap;
 use crate::function::Function;
 use crate::tokenizer::{Token, Type};
 use crate::_macro::Macro;
-use crate::DEBUG;
+use crate::{DEBUG, MACRO_DEPTH_LIMIT};
 
 pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
     let result: Vec<u8> = Vec::new();
 
-    let macros;
+    let mut macros;
     match parse_macros(&toks) {
         Ok(list) => macros = list,
-        Err(error) => panic!("error while parsing macros\n{error:?}")
+        Err(error) => panic!("error while parsing macros\n{error}")
     }
 
     if DEBUG == 1 {
         println!("parsed {} macro(s), {:?}", macros.len(), macros);
     }
 
-    let functions;
+    let mut functions;
     match parse_functions(&toks) {
         Ok(list) => functions = list,
-        Err(error) => panic!("error while parsing functions\n{error:?}")
+        Err(error) => panic!("error while parsing functions\n{error}")
     }
 
     if DEBUG == 1 {
         println!("parsed {} function(s), {:?}", functions.len(), functions);
+    }
+
+    // these two loops would all be a function if the borrow checker let me
+    // i might make it a function some day but right now i cannot be bothered to figure it out
+    let mut resolved_macro = true;
+    let mut iteration = 0;
+    while resolved_macro && iteration < MACRO_DEPTH_LIMIT { //TODO: smarter macro depth limit system
+        resolved_macro = false;
+        // borrow checker madness
+        // for some ungodly reason iterating over a hashmap takes ownership of the hashmap
+        let rust_why = macros.clone(); // resulting in this cloning
+        let mut new_macros: HashMap<String, Macro> = HashMap::new(); // and reconstructing mess
+        for (name, mut _macro) in macros {
+            // again i'd just modify the original macros content (even a clone of it)
+            // but rust doesn't let me because somehow im doing mutable and immutable borrows when im not
+            let mut new_content: Vec<Vec<Token>> = Vec::new();
+
+            let mut i = 0;
+            while i < _macro.content.len() {
+                match &_macro.content[i][0] {
+                    Token::IDENT(n) => {
+                        if rust_why.contains_key(n) {
+                            resolved_macro = true;
+
+                            let referenced_macro = rust_why.get(n).expect("unreachable");
+                            let mut j = 0;
+                            for line in &referenced_macro.content {
+                                new_content.push(Vec::new());
+
+                                for token in line {
+                                    match token {
+                                        Token::IDENT(n) => {
+                                            if referenced_macro.args.contains(n) {
+                                                let index = referenced_macro.args.iter().position(|r| r == n).unwrap();
+                                                new_content[i + j].push(_macro.content[i][index + 1].clone());
+                                            } else {
+                                                new_content[i + j].push(token.clone());
+                                            }
+                                        }
+                                        _ => new_content[i + j].push(token.clone())
+                                    }
+                                }
+                                j = j + 1;
+                            }
+                        } else {
+                            new_content.push(Vec::new());
+                            new_content[i].append(&mut _macro.content[i]);
+                        }
+                    }
+                    _ => {
+                        new_content.push(Vec::new());
+                        new_content[i].append(&mut _macro.content[i]);
+                    }
+                }
+
+                i = i + 1;
+            }
+
+            _macro.content = new_content;
+
+            new_macros.insert(name, _macro);
+        }
+
+        macros = new_macros;
+        iteration = iteration + 1;
+    }
+
+    if iteration == MACRO_DEPTH_LIMIT {
+        panic!("error while resolving macros:\nhit macro depth limit");
+    }
+
+    let mut new_functions: HashMap<String, Function> = HashMap::new();
+    for (name, mut function) in functions {
+        let mut new_body: Vec<Vec<Token>> = Vec::new();
+
+        let mut i = 0;
+        while i < function.body.len() {
+            match &function.body[i][0] {
+                Token::IDENT(n) => {
+                    if macros.contains_key(n) {
+                        let referenced_macro = macros.get(n).expect("unreachable");
+                        let mut j = 0;
+                        for line in &referenced_macro.content {
+                            new_body.push(Vec::new());
+
+                            for token in line {
+                                match token {
+                                    Token::IDENT(n) => {
+                                        if referenced_macro.args.contains(n) {
+                                            let index = referenced_macro.args.iter().position(|r| r == n).unwrap();
+                                            new_body[i + j].push(function.body[i][index + 1].clone());
+                                        } else {
+                                            new_body[i + j].push(token.clone());
+                                        }
+                                    }
+                                    _ => new_body[i + j].push(token.clone())
+                                }
+                            }
+                            j = j + 1;
+                        }
+                    } else {
+                        new_body.push(Vec::new());
+                        new_body[i].append(&mut function.body[i]);
+                    }
+                }
+                _ => {
+                    new_body.push(Vec::new());
+                    new_body[i].append(&mut function.body[i]);
+                }
+            }
+
+            i = i + 1;
+        }
+
+        function.body = new_body;
+
+        new_functions.insert(name, function);
+    }
+    functions = new_functions;
+
+    if DEBUG >= 1 {
+        println!("after macro resolution...");
+        println!("parsed {} macro(s), {:?}", macros.len(), macros);
+        println!("parsed {} functions(s), {:?}", functions.len(), functions);
     }
 
     return result;
@@ -141,6 +265,24 @@ fn parse_macros(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Macro>, String
                 }
             }
 
+            let mut args: Vec<String> = Vec::new();
+
+            let mut j = 3;
+            while j < line.len() && line[j] != Token::LCURLY {
+                match &line[j] {
+                    Token::IDENT(n) => {
+                        if !args.contains(n) {
+                            args.push(n.clone())
+                        } else {
+                            return Err(format!("found duplicate macro argument {:?}", line[j]))
+                        }
+                    }
+                    _ => return Err(format!("unexpected token {:?}, expected IDENT", line[j]))
+                }
+
+                j = j + 1;
+            }
+
             if DEBUG >= 1 {
                 println!("found macro named {}", name);
             }
@@ -149,7 +291,7 @@ fn parse_macros(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Macro>, String
                 i = i + 1;
             }
 
-            let mut _macro = Macro {name: name.clone(), content: Vec::new()};
+            let mut _macro = Macro {name: name.clone(), args: args, content: Vec::new()};
 
             i = i + 1;
             while !toks[i].contains(&Token::RCURLY) {

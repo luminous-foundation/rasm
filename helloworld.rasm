@@ -4,7 +4,7 @@
 }
 
 void main() {
-    CALL1 io.print text
+    CALL1 io_print text
     RETURN
 }
 
