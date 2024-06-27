@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Type {
     VOID,
     I8,
@@ -50,7 +50,7 @@ fn is_type(input: &str) -> bool {
     TYPE_MAP.contains_key(&input.to_uppercase()[..])
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     NUMBER(u128),
     TYPE(Type),
@@ -136,6 +136,9 @@ pub fn tokenize(line: String) -> Vec<Token> {
                 }
                 ' ' | '\r' | '\n' => {
                     push!(tokens, cur_token, in_num);
+                }
+                ';' => {
+                    break;
                 }
                 _ => cur_token.push(c)
             }
