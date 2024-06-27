@@ -80,6 +80,7 @@ macro_rules! push {
     };
 }
 
+// TODO: character literals
 pub fn tokenize(line: String) -> Vec<Token> {
     let mut tokens: Vec<Token> = Vec::new();
 

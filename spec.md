@@ -90,8 +90,10 @@ str_1 char* "Hello, World!"
 ```
 An example function with arguments is
 ```c
-void bar(i32 n) {
-    LDARG n
+void bar(i32 x u64 y) {
+    LDARG x
+    CALL io.print
+    LDARG y
     CALL io.print
 }
 ```
