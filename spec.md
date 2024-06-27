@@ -28,6 +28,8 @@
 [ ]   RSH     [imm/var]   [var]
 [ ]   VAR     [type/var]  [name]
 [ ]   RET     [imm/var]
+[ ]   DEREF   [ptr]       [var]
+[ ]   REF     [var]       [ptr]
 ```
 
 ## TYPES
@@ -86,11 +88,18 @@ void foo() {
 .data
 str_1 char* "Hello, World!"
 ```
+An example function with arguments is
+```c
+void bar(i32 n) {
+    LDARG n
+    CALL io.print
+}
+```
 
 ## LABELS
 Labels can be placed anywhere in a function, and used in combination with jump instructions to jump around inside of a function.
 ```c
-void bar() { ; this creates an infinite loop
+void baz() { ; this creates an infinite loop
     :label
     JMP :label
 }
