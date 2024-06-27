@@ -53,7 +53,7 @@ fn is_type(input: &str) -> bool {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     NUMBER(u128),
-    TYPE(Type),
+    TYPE(Vec<Type>),
     LPAREN,
     RPAREN,
     LCURLY,
@@ -87,10 +87,19 @@ pub fn tokenize(line: String) -> Vec<Token> {
     let mut cur_token: String = String::from("");
     let mut in_str = false;
     let mut in_num = false;
+
+    let mut in_type = false;
+    let mut temp_type: Vec<Type> = Vec::new();
     for c in line.chars() {
         if is_type(&cur_token) {
-            tokens.push(Token::TYPE(*TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap()));
+            temp_type.push(*TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap());
             cur_token = String::from("");
+            in_type = true;
+        } else if in_type {
+            in_type = false;
+            temp_type.reverse();
+            tokens.push(Token::TYPE(temp_type.clone()));
+            temp_type.clear();
         }
         if !in_str {
             match c {
