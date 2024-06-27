@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::conversion::convert_string;
+use crate::data::Data;
 use crate::function::Function;
 use crate::tokenizer::{Token, Type};
 use crate::_macro::Macro;
@@ -11,7 +13,7 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
     let mut macros;
     match parse_macros(&toks) {
         Ok(list) => macros = list,
-        Err(error) => panic!("error while parsing macros\n{error}")
+        Err(error) => panic!("error while parsing macros:\n{error}")
     }
 
     if DEBUG == 1 {
@@ -21,11 +23,21 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
     let mut functions;
     match parse_functions(&toks) {
         Ok(list) => functions = list,
-        Err(error) => panic!("error while parsing functions\n{error}")
+        Err(error) => panic!("error while parsing functions\n:{error}")
     }
 
     if DEBUG == 1 {
         println!("parsed {} function(s), {:?}", functions.len(), functions);
+    }
+
+    let mut data;
+    match parse_data(&toks) {
+        Ok(t) => data = t,
+        Err(error) => panic!("error while parsing data section:\n{error}")
+    }
+
+    if DEBUG == 1 {
+        println!("parsed {} data value(s), {:?}", data.len(), data);
     }
 
     // these two loops would all be a function if the borrow checker let me
@@ -155,6 +167,60 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
     return result;
 }
 
+fn parse_data(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Data>, String> {
+    let mut data: HashMap<String, Data> = HashMap::new();
+
+    let mut in_section = false;
+    let mut i = 0;
+    while i < toks.len() {
+        let line = &toks[i];
+
+        if in_section {
+            let name;
+            match &line[0] {
+                Token::IDENT(n) => name = n,
+                _ => return Err(format!("unexpected token {:?}, expected IDENT", line[0]))
+            }
+
+            if DEBUG >= 1 {
+                println!("found data value named {}", name);
+            }
+
+            let _type;
+            match &line[1] {
+                Token::TYPE(n) => _type = n,
+                _ => return Err(format!("unexpected token {:?}, expected TYPE", line[0]))
+            }
+
+            let bytes: Vec<u8>;
+            match &line[2] { // i'm just going to implement this as i go along
+                Token::NUMBER(_) => todo!(),
+                Token::TYPE(_) => todo!(),
+                Token::LPAREN => todo!(),
+                Token::RPAREN => todo!(),
+                Token::LCURLY => todo!(),
+                Token::RCURLY => todo!(),
+                Token::LSQUARE => todo!(),
+                Token::RSQUARE => todo!(),
+                Token::STRING(text) => bytes = convert_string(text),
+                Token::DOT => todo!(),
+                Token::COMMA => todo!(),
+                Token::IDENT(_) => todo!(),
+            }
+
+            data.insert(name.clone(), Data {name: name.clone(), _type: _type.clone(), data: bytes});
+        }
+
+        if line[0] == Token::DOT && line[1] == Token::IDENT("data".to_string()) {
+            in_section = true;
+        }
+
+        i = i + 1;
+    }
+
+    return Ok(data);
+}
+
 fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, String> {
     let mut functions: HashMap<String, Function> = HashMap::new();
 
@@ -183,7 +249,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, 
             if is_func {
                 let return_type;
                 match &line[0] {
-                    Token::TYPE(t) => return_type = *t,
+                    Token::TYPE(t) => return_type = t.clone(),
                     _ => {
                         return Err("unreachable".to_string())
                     }
@@ -201,14 +267,14 @@ fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, 
                     println!("found function named {}", name);
                 }
 
-                let mut arg_types: Vec<Type> = Vec::new();
+                let mut arg_types: Vec<Vec<Type>> = Vec::new();
                 let mut arg_names: Vec<String> = Vec::new();
 
                 let mut j = 3;
 
                 while line[j] != Token::RPAREN {
                     let _type;
-                    match line[j] {
+                    match &line[j] {
                         Token::TYPE(t) => _type = t,
                         _ => return Err(format!("unexpected token {:?}, expected TYPE", line[j]))
                     }
@@ -219,7 +285,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, 
                         _ => return Err(format!("unexpected token {:?}, expected IDENT", line[j]))
                     }
 
-                    arg_types.push(_type);
+                    arg_types.push(_type.clone());
                     arg_names.push(name.clone());
 
                     j = j + 2;
