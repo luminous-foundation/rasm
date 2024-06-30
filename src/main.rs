@@ -15,6 +15,9 @@ mod error;
 static DEBUG: u8 = 0;
 static MACRO_DEPTH_LIMIT: u16 = 16;
 
+// TODO: file importing
+// TODO: labels
+// TODO: structs
 fn main() {
     let start = std::time::Instant::now();
     let file_path = "helloworld".to_string();
