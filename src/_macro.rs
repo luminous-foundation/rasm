@@ -6,5 +6,7 @@ pub struct Macro {
 
     pub name: String,
     pub args: Vec<String>,
-    pub content: Vec<Vec<Token>>
+
+    pub content: Vec<Vec<Token>>,
+    pub content_loc: Vec<Vec<Loc>>
 }

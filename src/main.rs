@@ -32,28 +32,23 @@ fn main() {
     for line in lines {
         loc.line = loc.line + 1;
         loc.col = line.chars().take_while(|ch| ch.is_whitespace() && *ch != '\n').count() + 1;
-        if line.trim().len() > 0 {
-            let line_tokens = tokenize(line.to_string(), &mut loc);
-            match line_tokens {
-                (toks, locs) => {
-                    if toks.len() > 0 {   
-                        if DEBUG >= 2 {
-                            println!("{:?}", toks);
-                            println!("{:?}", locs);
-                        }
-                        tokens.push(toks);
-                        locations.push(locs);
-                    }
+        let line_tokens = tokenize(line.to_string(), &mut loc);
+        match line_tokens {
+            (toks, locs) => {
+                if DEBUG >= 2 {
+                    println!("{:?}", toks);
+                    println!("{:?}", locs);
                 }
+                tokens.push(toks);
+                locations.push(locs);
             }
         }
     }
 
-    println!("assembly took {:.2}ms", start.elapsed().as_secs_f32() * 1000f32);   
-
     let rbb_file = "./".to_string() + &file_path.clone() + ".rbb";
 
     let bytes = parse(tokens, locations);
+    println!("assembly took {:.2}ms", start.elapsed().as_secs_f32() * 1000f32);
 
     if Path::new(&rbb_file).exists() {
        fs::remove_file(rbb_file.clone()).unwrap();

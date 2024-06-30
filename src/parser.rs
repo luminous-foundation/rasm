@@ -45,7 +45,8 @@ lazy_static! {
     };
 }
 
-pub fn parse(toks: Vec<Vec<Token>>, locs: Vec<Vec<Loc>>) -> Vec<u8> {
+// TODO: show where errors expanded from
+pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
 
     let mut macros;
@@ -58,7 +59,7 @@ pub fn parse(toks: Vec<Vec<Token>>, locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
 
     if DEBUG == 1 {
-        println!("parsed {} macro(s), {:?}", macros.len(), macros);
+        println!("parsed {} macro(s), {:#?}", macros.len(), macros);
     }
 
     let mut functions;
@@ -71,7 +72,7 @@ pub fn parse(toks: Vec<Vec<Token>>, locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
 
     if DEBUG >= 1 {
-        println!("parsed {} function(s), {:?}", functions.len(), functions);
+        println!("parsed {} function(s), {:#?}", functions.len(), functions);
     }
 
     let data;
@@ -84,7 +85,7 @@ pub fn parse(toks: Vec<Vec<Token>>, locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
 
     if DEBUG >= 1 {
-        println!("parsed {} data value(s), {:?}", data.len(), data);
+        println!("parsed {} data value(s), {:#?}", data.len(), data);
     }
 
     // these two loops would all be a function if the borrow checker let me
@@ -180,43 +181,55 @@ pub fn parse(toks: Vec<Vec<Token>>, locs: Vec<Vec<Loc>>) -> Vec<u8> {
         let mut i = 0;
         let mut line_num = 0;
         while i < function.body.len() {
-            match &function.body[i][0] {
-                Token::IDENT(n) => {
-                    if macros.contains_key(n) {
-                        let referenced_macro = macros.get(n).expect("unreachable");
-                        let mut j = 0;
-                        for line in &referenced_macro.content {
-                            new_body.push(Vec::new());
+            if function.body[i].len() > 0 {
+                match &function.body[i][0] {
+                    Token::IDENT(n) => {
+                        if macros.contains_key(n) {
+                            let referenced_macro = macros.get(n).expect("unreachable");
+                            let mut j = 0;
+                            for line in &referenced_macro.content {
+                                new_body.push(Vec::new());
 
-                            for token in line {
-                                match token {
-                                    Token::IDENT(n) => {
-                                        if referenced_macro.args.contains(n) {
-                                            let index = referenced_macro.args.iter().position(|r| r == n).unwrap();
-                                            new_body[i + j].push(function.body[i][index + 1].clone());
-                                        } else {
-                                            new_body[i + j].push(token.clone());
-                                        }
+                                if j > 0 {
+                                    let mut new_loc = referenced_macro.content_loc[j].clone();
+                                    for l in &mut new_loc {
+                                        l.line = function.loc.line + i;
                                     }
-                                    _ => new_body[i + j].push(token.clone())
+                                    locs.push(new_loc);
                                 }
+
+                                for token in line {
+                                    match token {
+                                        Token::IDENT(n) => {
+                                            if referenced_macro.args.contains(n) {
+                                                let index = referenced_macro.args.iter().position(|r| r == n).unwrap();
+                                                new_body[line_num + j].push(function.body[i][index + 1].clone());
+                                            } else {
+                                                new_body[line_num + j].push(token.clone());
+                                            }
+                                        }
+                                        _ => new_body[line_num + j].push(token.clone())
+                                    }
+                                }
+                                j = j + 1;
                             }
-                            j = j + 1;
+                            line_num = line_num + j - 1;
+                        } else {
+                            new_body.push(Vec::new());
+                            new_body[line_num].append(&mut function.body[i]);
                         }
-                        line_num = line_num + j - 1;
-                    } else {
+                    }
+                    _ => {
                         new_body.push(Vec::new());
                         new_body[line_num].append(&mut function.body[i]);
                     }
                 }
-                _ => {
-                    new_body.push(Vec::new());
-                    new_body[line_num].append(&mut function.body[i]);
-                }
+            } else {
+                new_body.push(Vec::new());
             }
 
-            i = i + 1;
             line_num = line_num + 1;
+            i = i + 1;
         }
 
         function.body = new_body;
@@ -225,10 +238,18 @@ pub fn parse(toks: Vec<Vec<Token>>, locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
     functions = new_functions;
 
+    let mut i = 0;
+    for line in &mut locs {
+        for l in line {
+            l.line = i;
+        }
+        i = i + 1;
+    }
+
     if DEBUG >= 1 {
         println!("after macro resolution...");
-        println!("parsed {} macro(s), {:?}", macros.len(), macros);
-        println!("parsed {} functions(s), {:?}", functions.len(), functions);
+        println!("parsed {} macro(s), {:#?}", macros.len(), macros);
+        println!("parsed {} functions(s), {:#?}", functions.len(), functions);
     }
 
     let mut i = 0;
@@ -284,7 +305,7 @@ fn emit_data(data: &Data) -> Vec<u8> {
     bytes.append(&mut convert_number(data.data.len() as u128));
     
     for b in &data.data {
-        bytes.push(b.clone());
+        bytes.push(*b);
     }
 
     return bytes;
@@ -310,7 +331,7 @@ fn emit_function(function: &Function, functions: &HashMap<String, Function>, loc
 
     let mut line_num = 0;
     for line in &function.body {
-        match emit_line(&line, functions, locs, line_num) {
+        match emit_line(&line, functions, locs, line_num + function.loc.line) {
             Ok(mut b) => bytes.append(&mut b),
             Err(error) => return Err(error)
         }
@@ -352,13 +373,13 @@ fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>, locs: &Ve
                             }
                             _ => return Err(Error {
                                 loc: locs[line_num][1].clone(),
-                                message: format!("unexpected token {:?}, expected IDENT", line[1])
+                                message: format!("unexpected token `{:?}`, expected `IDENT`", line[1])
                             })
                         }
                     }
                     _ => return Err(Error {
                         loc: locs[line_num][0].clone(),
-                        message: format!("unknown instruction {}", instr)
+                        message: format!("unknown instruction `{}`", instr)
                     })
                 }
 
@@ -367,7 +388,7 @@ fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>, locs: &Ve
             }
             _ => return Err(Error {
                 loc: locs[line_num][1].clone(),
-                message: format!("unexpected token {:?}, expected IDENT", line[0])
+                message: format!("unexpected token `{:?}`, expected `IDENT`", line[0])
             })
         }
 
@@ -391,7 +412,7 @@ fn emit_token(token: &Token, bytes: &mut Vec<u8>) -> Result<(), String> {
         Token::IDENT(str) => bytes.append(&mut convert_bytecode_string(str)),
         Token::NUMBER(n) => bytes.append(&mut convert_number(*n)),
         Token::TYPE(t) => bytes.append(&mut convert_type(t)),
-        _ => return Err(format!("unexpected token {:?}, expected IDENT, NUMBER or TYPE", token))
+        _ => return Err(format!("unexpected token `{:?}`, expected `IDENT`, `NUMBER` or `TYPE`", token))
     }
 
     return Ok(());
@@ -403,7 +424,7 @@ fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
         match line[i] {
             Token::IDENT(_) => variation = variation | (1 << i),
             Token::NUMBER(_) => (),
-            _ => return Err(format!("unexpected token {:?}, expected NUMBER or IDENT", line[i]))
+            _ => return Err(format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[i]))
         }
     }
 
@@ -425,7 +446,7 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
                 _ => 
                 return Err(Error {
                     loc: locs[i][0].clone(),
-                    message: format!("unexpected token {:?}, expected IDENT", line[0])
+                    message: format!("unexpected token `{:?}`, expected `IDENT`", line[0])
                 })
             }
 
@@ -439,14 +460,14 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
                 _ => 
                 return Err(Error {
                     loc: locs[i][0].clone(),
-                    message: format!("unexpected token {:?}, expected TYPE", line[1])
+                    message: format!("unexpected token `{:?}`, expected `TYPE`", line[1])
                 })
             }
 
             let bytes: Vec<u8>;
             match &line[2] { // i'm just going to implement this as i go along
-                Token::NUMBER(_) => todo!(),
-                Token::TYPE(_) => todo!(),
+                Token::NUMBER(n) => bytes = convert_number(*n),
+                Token::TYPE(t) => bytes = convert_type(t),
                 Token::LPAREN => todo!(),
                 Token::RPAREN => todo!(),
                 Token::LCURLY => todo!(),
@@ -480,6 +501,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
     let mut i = 0;
     while i < toks.len() {
         let line = &toks[i];
+        let start = i;
         
         if line.len() > 3 {
             let mut is_func = matches!(
@@ -538,7 +560,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
                         _ => 
                         return Err(Error {
                             loc: locs[i][j].clone(),
-                            message: format!("unexpected token {:?}, expected TYPE", line[j])
+                            message: format!("unexpected token `{:?}`, expected `TYPE`", line[j])
                         })
                     }
 
@@ -548,7 +570,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
                         _ => 
                         return Err(Error {
                             loc: locs[i][j].clone(),
-                            message: format!("unexpected token {:?}, expected IDENT", line[j])
+                            message: format!("unexpected token `{:?}`, expected `IDENT`", line[j])
                         })
                     }
 
@@ -558,11 +580,20 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
                     j = j + 2;
                 }
 
-                let mut function = Function {name: name.to_string(), arg_types, arg_names, return_type, body: Vec::new()};
+                let mut function = Function {
+                    loc: locs[start][0].clone(), 
+
+                    name: name.to_string(), 
+                    arg_types, arg_names, return_type, 
+                    
+                    body: Vec::new(),
+                    body_loc: Vec::new()
+                };
                 
                 i = i + 1;
                 while !toks[i].contains(&Token::RCURLY) {
                     function.body.push(toks[i].clone());
+                    function.body_loc.push(locs[i].clone());
 
                     i = i + 1;
                 }
@@ -585,6 +616,7 @@ fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<
     let mut i = 0;
     while i < toks.len() {
         let line = &toks[i];
+        let start = i;
 
         if line.len() > 0 {
             if line[0] == Token::DOT && line[1] == Token::IDENT("macro".to_string()) {
@@ -601,7 +633,7 @@ fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<
                     _ => {
                         return Err(Error {
                             loc: locs[i][2].clone(),
-                            message: format!("unexpected token {:?}, expected IDENT", line[2])
+                            message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
                         });
                     }
                 }
@@ -617,14 +649,14 @@ fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<
                             } else {
                                 return Err(Error {
                                     loc: locs[i][j].clone(),
-                                    message: format!("found duplicate macro argument {:?}", line[j])
+                                    message: format!("found duplicate macro argument `{:?}`", line[j])
                                 });
                             }
                         }
                         _ => 
                         return Err(Error {
                             loc: locs[i][j].clone(),
-                            message: format!("unexpected token {:?}, expected IDENT", line[j])
+                            message: format!("unexpected token `{:?}`, expected `IDENT`", line[j])
                         })
                     }
 
@@ -639,11 +671,20 @@ fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<
                     i = i + 1;
                 }
 
-                let mut _macro = Macro {loc: locs[i][0].clone(), name: name.clone(), args: args, content: Vec::new()};
+                let mut _macro = Macro {
+                    loc: locs[start][0].clone(), 
+                    
+                    name: name.clone(), 
+                    args: args, 
+                    
+                    content: Vec::new(),
+                    content_loc: Vec::new(),
+                };
 
                 i = i + 1;
                 while !toks[i].contains(&Token::RCURLY) {
                     _macro.content.push(toks[i].clone());
+                    _macro.content_loc.push(locs[i].clone());
 
                     i = i + 1;
                 }
