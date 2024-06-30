@@ -5,7 +5,7 @@
 
 void main() {
     CALL1 io_print text
-    RETURN
+    RET
 }
 
 .data
