@@ -158,7 +158,7 @@ pub fn parse(toks: Vec<Vec<Token>>, locs: Vec<Vec<Loc>>) -> Vec<u8> {
         iteration = iteration + 1;
     }
 
-    if iteration == MACRO_DEPTH_LIMIT { // TODO: better error handling
+    if iteration == MACRO_DEPTH_LIMIT {
         eprintln!("{}", Error {
             loc: macros.get(&last_macros[0]).expect("unreachable").loc.clone(),
             message: "hit macro depth limit".to_string()
