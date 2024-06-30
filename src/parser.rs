@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::process;
 
 use lazy_static::lazy_static;
 
 use crate::conversion::{convert_bytecode_string, convert_number, convert_string, convert_type, get_bytes_needed};
 use crate::data::Data;
+use crate::error::{Error, Loc, Note};
 use crate::function::Function;
 use crate::tokenizer::{Token, Type};
 use crate::_macro::Macro;
@@ -43,13 +45,16 @@ lazy_static! {
     };
 }
 
-pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
+pub fn parse(toks: Vec<Vec<Token>>, locs: Vec<Vec<Loc>>) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
 
     let mut macros;
-    match parse_macros(&toks) {
+    match parse_macros(&toks, &locs) {
         Ok(list) => macros = list,
-        Err(error) => panic!("error while parsing macros:\n{error}")
+        Err(error) => {
+            eprintln!("{}", error);
+            process::exit(1);
+        }
     }
 
     if DEBUG == 1 {
@@ -57,9 +62,12 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
     }
 
     let mut functions;
-    match parse_functions(&toks) {
+    match parse_functions(&toks, &locs) {
         Ok(list) => functions = list,
-        Err(error) => panic!("error while parsing functions\n:{error}")
+        Err(error) => {
+            eprintln!("{}", error);
+            process::exit(1);
+        }
     }
 
     if DEBUG >= 1 {
@@ -67,9 +75,12 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
     }
 
     let data;
-    match parse_data(&toks) {
+    match parse_data(&toks, &locs) {
         Ok(t) => data = t,
-        Err(error) => panic!("error while parsing data section:\n{error}")
+        Err(error) => {
+            eprintln!("{}", error);
+            process::exit(1);
+        }
     }
 
     if DEBUG >= 1 {
@@ -80,6 +91,8 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
     // i might make it a function some day but right now i cannot be bothered to figure it out
     let mut resolved_macro = true;
     let mut iteration = 0;
+
+    let mut last_macros: Vec<String> = Vec::new();
     while resolved_macro && iteration < MACRO_DEPTH_LIMIT { //TODO: smarter macro depth limit system
         resolved_macro = false;
         // borrow checker madness
@@ -97,6 +110,10 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
                     Token::IDENT(n) => {
                         if rust_why.contains_key(n) {
                             resolved_macro = true;
+                            
+                            if !last_macros.contains(&name) {
+                                last_macros.push(name.clone());
+                            }
 
                             let referenced_macro = rust_why.get(n).expect("unreachable");
                             let mut j = 0;
@@ -134,15 +151,26 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
 
             _macro.content = new_content;
 
-            new_macros.insert(name, _macro);
+            new_macros.insert(_macro.name.clone(), _macro);
         }
 
         macros = new_macros;
         iteration = iteration + 1;
     }
 
-    if iteration == MACRO_DEPTH_LIMIT {
-        panic!("error while resolving macros:\nhit macro depth limit");
+    if iteration == MACRO_DEPTH_LIMIT { // TODO: better error handling
+        eprintln!("{}", Error {
+            loc: macros.get(&last_macros[0]).expect("unreachable").loc.clone(),
+            message: "hit macro depth limit".to_string()
+        });
+
+        for i in 1..last_macros.len() { // skip the first one
+            eprintln!("{}", Note {
+                loc: macros.get(&last_macros[i]).expect("unreachable").loc.clone(),
+                message: "also this macro".to_string()
+            });
+        }
+        process::exit(1);
     }
 
     let mut new_functions: HashMap<String, Function> = HashMap::new();
@@ -215,9 +243,12 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
         }
 
         if in_top_level {
-            match emit_line(line, &functions) {
+            match emit_line(line, &functions, &locs, i) {
                 Ok(mut bytes) => result.append(&mut bytes),
-                Err(error) => panic!("error while emitting line:\n{error}")
+                Err(error) => {
+                    eprintln!("{}", error);
+                    process::exit(1);
+                }
             }
         }
 
@@ -225,26 +256,26 @@ pub fn parse(toks: Vec<Vec<Token>>) -> Vec<u8> {
     }
 
     for (_, function) in &functions {
-        match emit_function(&function, &functions) {
+        match emit_function(&function, &functions, &locs) {
             Ok(mut bytes) => result.append(&mut bytes),
-            Err(error) => panic!("error while emitting function:\n{error}")
+            Err(error) => {
+                eprintln!("{}", error);
+                process::exit(1);
+            }
         }
     }
 
     if data.len() > 0 {
         result.push(0xFC);
         for (_, dat) in data {
-            match emit_data(&dat) {
-                Ok(mut bytes) => result.append(&mut bytes),
-                Err(error) => panic!("error while emitting data:\n{error}")
-            }
+            result.append(&mut emit_data(&dat));
         }
     }
 
     return result;
 }
 
-fn emit_data(data: &Data) -> Result<Vec<u8>, String> {
+fn emit_data(data: &Data) -> Vec<u8> {
     let mut bytes: Vec<u8> = Vec::new();
 
     bytes.append(&mut convert_bytecode_string(&data.name));
@@ -256,10 +287,10 @@ fn emit_data(data: &Data) -> Result<Vec<u8>, String> {
         bytes.push(b.clone());
     }
 
-    return Ok(bytes);
+    return bytes;
 }
 
-fn emit_function(function: &Function, functions: &HashMap<String, Function>) -> Result<Vec<u8>, String> {
+fn emit_function(function: &Function, functions: &HashMap<String, Function>, locs: &Vec<Vec<Loc>>) -> Result<Vec<u8>, Error> {
     let mut bytes: Vec<u8> = Vec::new();
 
     bytes.push(0xFF);
@@ -277,11 +308,13 @@ fn emit_function(function: &Function, functions: &HashMap<String, Function>) -> 
 
     bytes.push(0xFE);
 
+    let mut line_num = 0;
     for line in &function.body {
-        match emit_line(&line, functions) {
+        match emit_line(&line, functions, locs, line_num) {
             Ok(mut b) => bytes.append(&mut b),
             Err(error) => return Err(error)
         }
+        line_num = line_num + 1;
     }
 
     bytes.push(0xFD);
@@ -289,7 +322,7 @@ fn emit_function(function: &Function, functions: &HashMap<String, Function>) -> 
     return Ok(bytes);
 }
 
-fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>) -> Result<Vec<u8>, String> {
+fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>, locs: &Vec<Vec<Loc>>, line_num: usize) -> Result<Vec<u8>, Error> {
     let mut bytes: Vec<u8> = Vec::new();
 
     if line.len() > 0 {
@@ -301,7 +334,11 @@ fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>) -> Result
                     "PUSH" | "LDARG" | "JMP" | "MOV" | "NOT" | "RET" => { // all [imm/var] instructions
                         match get_variation(&line, 1) {
                             Ok(v) => variation = v,
-                            Err(err) => return Err(err)
+                            Err(err) => 
+                            return Err(Error { 
+                                loc: locs[line_num][0].clone(),
+                                message: err
+                            })
                         }
                     }
                     "CALL" => { // CALL is special ([func/var])
@@ -313,22 +350,35 @@ fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>) -> Result
                                     variation = 1;
                                 }
                             }
-                            _ => return Err(format!("unexpected token {:?}, expected IDENT", line[1]))
+                            _ => return Err(Error {
+                                loc: locs[line_num][1].clone(),
+                                message: format!("unexpected token {:?}, expected IDENT", line[1])
+                            })
                         }
                     }
-                    _ => return Err(format!("unknown instruction {}", instr))
+                    _ => return Err(Error {
+                        loc: locs[line_num][0].clone(),
+                        message: format!("unknown instruction {}", instr)
+                    })
                 }
 
                 let byte = INSTR_MAP.get(instr.as_str()).expect("unreachable, the previous step should've caught this").clone();
                 bytes.push(byte + variation);
             }
-            _ => return Err(format!("unexpected token {:?}, expected IDENT", line[0]))
+            _ => return Err(Error {
+                loc: locs[line_num][1].clone(),
+                message: format!("unexpected token {:?}, expected IDENT", line[0])
+            })
         }
 
         for i in 1..line.len() {
             match emit_token(&line[i], &mut bytes) {
                 Ok(_) => (),
-                Err(error) => return Err(error)
+                Err(err) => 
+                return Err(Error { 
+                    loc: locs[line_num][i].clone(),
+                    message: err
+                })
             }
         }
     }
@@ -360,7 +410,7 @@ fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
     return Ok(variation);
 }
 
-fn parse_data(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Data>, String> {
+fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Data>, Error> {
     let mut data: HashMap<String, Data> = HashMap::new();
 
     let mut in_section = false;
@@ -372,7 +422,11 @@ fn parse_data(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Data>, String> {
             let name;
             match &line[0] {
                 Token::IDENT(n) => name = n,
-                _ => return Err(format!("unexpected token {:?}, expected IDENT", line[0]))
+                _ => 
+                return Err(Error {
+                    loc: locs[i][0].clone(),
+                    message: format!("unexpected token {:?}, expected IDENT", line[0])
+                })
             }
 
             if DEBUG >= 1 {
@@ -382,7 +436,11 @@ fn parse_data(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Data>, String> {
             let _type;
             match &line[1] {
                 Token::TYPE(n) => _type = n,
-                _ => return Err(format!("unexpected token {:?}, expected TYPE", line[0]))
+                _ => 
+                return Err(Error {
+                    loc: locs[i][0].clone(),
+                    message: format!("unexpected token {:?}, expected TYPE", line[1])
+                })
             }
 
             let bytes: Vec<u8>;
@@ -416,7 +474,7 @@ fn parse_data(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Data>, String> {
     return Ok(data);
 }
 
-fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, String> {
+fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Function>, Error> {
     let mut functions: HashMap<String, Function> = HashMap::new();
 
     let mut i = 0;
@@ -446,7 +504,10 @@ fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, 
                 match &line[0] {
                     Token::TYPE(t) => return_type = t.clone(),
                     _ => {
-                        return Err("unreachable".to_string())
+                        return Err(Error {
+                            loc: locs[i][0].clone(),
+                            message: "unreachable".to_string()
+                        })
                     }
                 }
 
@@ -454,7 +515,10 @@ fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, 
                 match &line[1] {
                     Token::IDENT(function_name) => name = function_name,
                     _ => {
-                        return Err("unreachable".to_string())
+                        return Err(Error {
+                            loc: locs[i][1].clone(),
+                            message: "unreachable".to_string()
+                        })
                     }
                 }
 
@@ -471,13 +535,21 @@ fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, 
                     let _type;
                     match &line[j] {
                         Token::TYPE(t) => _type = t,
-                        _ => return Err(format!("unexpected token {:?}, expected TYPE", line[j]))
+                        _ => 
+                        return Err(Error {
+                            loc: locs[i][j].clone(),
+                            message: format!("unexpected token {:?}, expected TYPE", line[j])
+                        })
                     }
 
                     let name;
                     match &line[j + 1] {
                         Token::IDENT(n) => name = n,
-                        _ => return Err(format!("unexpected token {:?}, expected IDENT", line[j]))
+                        _ => 
+                        return Err(Error {
+                            loc: locs[i][j].clone(),
+                            message: format!("unexpected token {:?}, expected IDENT", line[j])
+                        })
                     }
 
                     arg_types.push(_type.clone());
@@ -507,7 +579,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Function>, 
 
 // TODO: better error handling
 // (print location and file)
-fn parse_macros(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Macro>, String> {
+fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Macro>, Error> {
     let mut macros: HashMap<String, Macro> = HashMap::new();
 
     let mut i = 0;
@@ -517,14 +589,20 @@ fn parse_macros(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Macro>, String
         if line.len() > 0 {
             if line[0] == Token::DOT && line[1] == Token::IDENT("macro".to_string()) {
                 if !line.contains(&Token::LCURLY) && !&toks[i + 1].contains(&Token::LCURLY) {
-                    return Err("macro does not have open curly".to_string());
+                    return Err(Error {
+                        loc: locs[i][0].clone(),
+                        message: "macro does not have open curly".to_string()
+                    });
                 }
 
                 let name;
                 match &line[2] {
                     Token::IDENT(macro_name) => name = macro_name,
                     _ => {
-                        return Err(format!("unexpected token {:?}, expected IDENT", line[2]))
+                        return Err(Error {
+                            loc: locs[i][2].clone(),
+                            message: format!("unexpected token {:?}, expected IDENT", line[2])
+                        });
                     }
                 }
 
@@ -537,10 +615,17 @@ fn parse_macros(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Macro>, String
                             if !args.contains(n) {
                                 args.push(n.clone())
                             } else {
-                                return Err(format!("found duplicate macro argument {:?}", line[j]))
+                                return Err(Error {
+                                    loc: locs[i][j].clone(),
+                                    message: format!("found duplicate macro argument {:?}", line[j])
+                                });
                             }
                         }
-                        _ => return Err(format!("unexpected token {:?}, expected IDENT", line[j]))
+                        _ => 
+                        return Err(Error {
+                            loc: locs[i][j].clone(),
+                            message: format!("unexpected token {:?}, expected IDENT", line[j])
+                        })
                     }
 
                     j = j + 1;
@@ -554,7 +639,7 @@ fn parse_macros(toks: &Vec<Vec<Token>>) -> Result<HashMap<String, Macro>, String
                     i = i + 1;
                 }
 
-                let mut _macro = Macro {name: name.clone(), args: args, content: Vec::new()};
+                let mut _macro = Macro {loc: locs[i][0].clone(), name: name.clone(), args: args, content: Vec::new()};
 
                 i = i + 1;
                 while !toks[i].contains(&Token::RCURLY) {

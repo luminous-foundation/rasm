@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 
+use crate::error::Loc;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
     VOID,
@@ -67,22 +69,28 @@ pub enum Token {
 }
 
 macro_rules! push {
-    ($tokens:expr, $cur_token:expr, $in_num:expr) => {
+    ($tokens:expr, $locs:expr, $cur_token:expr, $in_num:expr, $loc:expr) => {
         if $cur_token.len() > 0 {
+            $locs.push($loc.clone());
+            $loc.col = $loc.col + $cur_token.len();
+
             if($in_num) {
                 $tokens.push(Token::NUMBER($cur_token.parse::<u128>().unwrap()));
                 $in_num = false;
             } else {
                 $tokens.push(Token::IDENT($cur_token));
             }
+
             $cur_token = String::from("");
         }
     };
 }
 
 // TODO: character literals
-pub fn tokenize(line: String) -> Vec<Token> {
+pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
     let mut tokens: Vec<Token> = Vec::new();
+
+    let mut locs: Vec<Loc> = Vec::new();
 
     let mut cur_token: String = String::from("");
     let mut in_str = false;
@@ -92,6 +100,9 @@ pub fn tokenize(line: String) -> Vec<Token> {
     let mut temp_type: Vec<Type> = Vec::new();
     for c in line.chars() {
         if is_type(&cur_token) {
+            locs.push(loc.clone());
+            loc.col = loc.col + cur_token.len();
+
             temp_type.push(*TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap());
             cur_token = String::from("");
             in_type = true;
@@ -101,6 +112,7 @@ pub fn tokenize(line: String) -> Vec<Token> {
             tokens.push(Token::TYPE(temp_type.clone()));
             temp_type.clear();
         }
+
         if !in_str {
             match c {
                 '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => { // TODO: float support
@@ -110,42 +122,66 @@ pub fn tokenize(line: String) -> Vec<Token> {
                     cur_token.push(c);
                 }
                 '(' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::LPAREN);
+
+                    locs.push(loc.clone());
+                    loc.col = loc.col + 1;
                 }
                 ')' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::RPAREN);
+
+                    locs.push(loc.clone());
+                    loc.col = loc.col + 1;
                 }
                 '{' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::LCURLY);
+
+                    locs.push(loc.clone());
+                    loc.col = loc.col + 1;
                 }
                 '}' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::RCURLY);
+
+                    locs.push(loc.clone());
+                    loc.col = loc.col + 1;
                 }
                 '[' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::LSQUARE);
+
+                    locs.push(loc.clone());
+                    loc.col = loc.col + 1;
                 }
                 ']' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::RSQUARE);
+
+                    locs.push(loc.clone());
+                    loc.col = loc.col + 1;
                 }
                 '"' => {
                     in_str = true;
                 }
                 '.' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::DOT);
+
+                    locs.push(loc.clone());
+                    loc.col = loc.col + 1;
                 }
                 ',' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::COMMA);
+
+                    locs.push(loc.clone());
+                    loc.col = loc.col + 1;
                 }
                 ' ' | '\r' | '\n' => {
-                    push!(tokens, cur_token, in_num);
+                    push!(tokens, locs, cur_token, in_num, loc);
                 }
                 ';' => {
                     break;
@@ -156,7 +192,11 @@ pub fn tokenize(line: String) -> Vec<Token> {
             // yes im using match for this
             match c {
                 '"' => {
+                    locs.push(loc.clone());
+                    loc.col = loc.col + cur_token.len();
+
                     tokens.push(Token::STRING(cur_token));
+
                     cur_token = String::from("");
                 }
                 _ => cur_token.push(c)
@@ -164,5 +204,5 @@ pub fn tokenize(line: String) -> Vec<Token> {
         }
     }
 
-    return tokens;
+    return (tokens, locs);
 }
