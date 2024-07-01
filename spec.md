@@ -140,9 +140,9 @@ MACRO 0 1 2
 
 ## STRUCTS
 Structs are custom data structures that contain variables.
-Their format is as follors
+Their format is as follows
 ```
-struct (name) {
+.struct (name) {
     (var)
     (var)
     ...
@@ -150,7 +150,7 @@ struct (name) {
 ```
 An example struct would look like this
 ```rust
-struct Foo {
+.struct Foo {
     i32 a
     f32 b
     char* txt
