@@ -181,6 +181,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     let mut new_functions: HashMap<String, Function> = HashMap::new();
     for (name, mut function) in functions {
         let mut new_body: Vec<Vec<Token>> = Vec::new();
+        let mut new_locs: Vec<Vec<Loc>> = Vec::new();
 
         let mut i = 0;
         let mut line_num = 0;
@@ -193,14 +194,16 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
                             let mut j = 0;
                             for line in &referenced_macro.content {
                                 new_body.push(Vec::new());
+                                
+                                new_locs.push(function.body_loc[i].clone());
 
-                                if j > 0 {
-                                    let mut new_loc = referenced_macro.content_loc[j].clone();
-                                    for l in &mut new_loc {
-                                        l.line = function.loc.line + i;
-                                    }
-                                    locs.push(new_loc);
-                                }
+                                // if j > 0 {
+                                    // let mut new_loc = referenced_macro.content_loc[j].clone();
+                                    // for l in &mut new_loc {
+                                    //     l.line = function.loc.line + i;
+                                    // }
+                                    // locs.push(new_loc);
+                                // }
 
                                 for token in line {
                                     match token {
@@ -221,15 +224,21 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
                         } else {
                             new_body.push(Vec::new());
                             new_body[line_num].append(&mut function.body[i]);
+                            
+                            new_locs.push(function.body_loc[i].clone());
                         }
                     }
                     _ => {
                         new_body.push(Vec::new());
                         new_body[line_num].append(&mut function.body[i]);
+                        
+                        new_locs.push(function.body_loc[i].clone());
                     }
                 }
             } else {
                 new_body.push(Vec::new());
+                
+                new_locs.push(function.body_loc[i].clone());
             }
 
             line_num = line_num + 1;
@@ -237,6 +246,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         }
 
         function.body = new_body;
+        function.body_loc = new_locs;
 
         new_functions.insert(name, function);
     }
@@ -245,7 +255,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     let mut i = 0;
     for line in &mut locs {
         for l in line {
-            l.line = i;
+            l.line = i + 1;
         }
         i = i + 1;
     }
@@ -254,6 +264,10 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         println!("after macro resolution...");
         println!("parsed {} macro(s), {:#?}", macros.len(), macros);
         println!("parsed {} functions(s), {:#?}", functions.len(), functions);
+        // println!("locs\n");
+        // for i in 0..locs.len() {
+        //     println!("{:?}", locs[i]);
+        // }
     }
 
     let mut i = 0;
@@ -281,7 +295,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
 
     for (_, function) in &functions {
-        match emit_function(&function, &functions, &locs) {
+        match emit_function(&function, &functions) {
             Ok(mut bytes) => result.append(&mut bytes),
             Err(error) => {
                 eprintln!("{}", error);
@@ -315,7 +329,7 @@ fn emit_data(data: &Data) -> Vec<u8> {
     return bytes;
 }
 
-fn emit_function(function: &Function, functions: &HashMap<String, Function>, locs: &Vec<Vec<Loc>>) -> Result<Vec<u8>, Error> {
+fn emit_function(function: &Function, functions: &HashMap<String, Function>) -> Result<Vec<u8>, Error> {
     let mut bytes: Vec<u8> = Vec::new();
 
     bytes.push(0xFF);
@@ -334,8 +348,9 @@ fn emit_function(function: &Function, functions: &HashMap<String, Function>, loc
     bytes.push(0xFE);
 
     let mut line_num = 0;
+    println!("{:?}", function.body_loc);
     for line in &function.body {
-        match emit_line(&line, functions, locs, line_num + function.loc.line) {
+        match emit_line(&line, functions, &function.body_loc, line_num) {
             Ok(mut b) => bytes.append(&mut b),
             Err(error) => return Err(error)
         }
