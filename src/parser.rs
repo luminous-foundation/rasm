@@ -47,6 +47,8 @@ lazy_static! {
 
 // TODO: show where errors expanded from
 pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
+    let debug = *DEBUG.lock().unwrap();
+
     let mut result: Vec<u8> = Vec::new();
 
     let mut macros;
@@ -58,7 +60,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         }
     }
 
-    if DEBUG == 1 {
+    if debug == 1 {
         println!("parsed {} macro(s), {:#?}", macros.len(), macros);
     }
 
@@ -71,7 +73,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         }
     }
 
-    if DEBUG >= 1 {
+    if debug >= 1 {
         println!("parsed {} function(s), {:#?}", functions.len(), functions);
     }
 
@@ -84,7 +86,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         }
     }
 
-    if DEBUG >= 1 {
+    if debug >= 1 {
         println!("parsed {} data value(s), {:#?}", data.len(), data);
     }
 
@@ -160,6 +162,8 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
 
     if iteration == MACRO_DEPTH_LIMIT {
+        last_macros.sort();
+
         eprintln!("{}", Error {
             loc: macros.get(&last_macros[0]).expect("unreachable").loc.clone(),
             message: "hit macro depth limit".to_string()
@@ -246,7 +250,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         i = i + 1;
     }
 
-    if DEBUG >= 1 {
+    if debug >= 1 {
         println!("after macro resolution...");
         println!("parsed {} macro(s), {:#?}", macros.len(), macros);
         println!("parsed {} functions(s), {:#?}", functions.len(), functions);
@@ -432,6 +436,8 @@ fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
 }
 
 fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Data>, Error> {
+    let debug = *DEBUG.lock().unwrap();
+
     let mut data: HashMap<String, Data> = HashMap::new();
 
     let mut in_section = false;
@@ -450,7 +456,7 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
                 })
             }
 
-            if DEBUG >= 1 {
+            if debug >= 1 {
                 println!("found data value named {}", name);
             }
 
@@ -498,6 +504,8 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
 fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Function>, Error> {
     let mut functions: HashMap<String, Function> = HashMap::new();
 
+    let debug = *DEBUG.lock().unwrap();
+
     let mut i = 0;
     while i < toks.len() {
         let line = &toks[i];
@@ -544,7 +552,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
                     }
                 }
 
-                if DEBUG >= 1 {
+                if debug >= 1 {
                     println!("found function named {}", name);
                 }
 
@@ -613,6 +621,8 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
 fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Macro>, Error> {
     let mut macros: HashMap<String, Macro> = HashMap::new();
 
+    let debug = *DEBUG.lock().unwrap();
+
     let mut i = 0;
     while i < toks.len() {
         let line = &toks[i];
@@ -663,7 +673,7 @@ fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<
                     j = j + 1;
                 }
 
-                if DEBUG >= 1 {
+                if debug >= 1 {
                     println!("found macro named {}", name);
                 }
 

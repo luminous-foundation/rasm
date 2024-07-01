@@ -19,6 +19,10 @@ pub struct Note {
     pub message: String
 }
 
+pub fn printerr(message: String) {
+    eprintln!("{} {}", "ERROR:".red().bold().underline(), message);
+}
+
 impl fmt::Display for Loc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{}:{}", self.file, self.line, self.col)

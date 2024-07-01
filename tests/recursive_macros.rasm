@@ -1,0 +1,7 @@
+.macro RECURSIVE1 {
+    RECURSIVE2
+}
+
+.macro RECURSIVE2 {
+    RECURSIVE1
+}
