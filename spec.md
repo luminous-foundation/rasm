@@ -82,7 +82,7 @@ An example function is
 ```c
 void foo() {
     LDARG str_1
-    CALL io.print
+    CALL io_print
 }
 
 .data
@@ -92,9 +92,9 @@ An example function with arguments is
 ```c
 void bar(i32 x u64 y) {
     LDARG x
-    CALL io.print
+    CALL io_print
     LDARG y
-    CALL io.print
+    CALL io_print
 }
 ```
 
