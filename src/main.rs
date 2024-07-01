@@ -162,11 +162,31 @@ fn process_test(output: Output) -> String {
 fn check_test(path: String, output: Output) -> bool {
     let path = (&path.as_str()[..path.len()-5]).to_string();
 
-    let saved_test = fs::read_to_string(path + ".testout").expect("unreachable, failed to read test file, should already exist");
+    let saved_test = fs::read_to_string(path.clone() + ".testout").expect("unreachable, failed to read test file, should already exist");
     let test_res = process_test(output);
 
     if test_res != saved_test {
         println!("EXPECTED:\n{}\nACTUAL:\n{}", saved_test, test_res);
+    }
+
+    if Path::new(&(path.clone() + ".rbbtestout")).exists() {
+        if !Path::new(&(path.clone() + ".rbb")).exists() {
+            println!("expected emitted bytecode, did not find it");
+            return false;
+        }
+        
+        let rbb_out = std::fs::read(path.clone() + ".rbb").unwrap();
+        let rbb_expected = std::fs::read(path + ".rbb").unwrap();
+
+        if rbb_out != rbb_expected {
+            println!("emitted bytecode did not match");
+            return false;
+        }
+    } else {
+        if Path::new(&(path.clone() + ".rbb")).exists() {
+            println!("did not expect emitted bytecode but found it");
+            return false;
+        }
     }
 
     return test_res == saved_test;
@@ -175,8 +195,14 @@ fn check_test(path: String, output: Output) -> bool {
 fn save_test(path: String, output: Output) {
     let path = (&path.as_str()[..path.len()-5]).to_string();
     let mut output_file = File::create(path.clone() + ".testout").expect(format!("failed to create file {}", path).as_str());
+
     let line = process_test(output);
+
     let _ = write!(output_file, "{}", line);
+
+    if Path::new(&(path.clone() + ".rbb")).exists() {
+        let _ = fs::rename(path.clone() + ".rbb", path + ".rbbtestout");
+    }
 }
 
 fn tests_update(folder: String) {
