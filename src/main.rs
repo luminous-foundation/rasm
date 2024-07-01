@@ -174,9 +174,9 @@ fn check_test(path: String, output: Output) -> bool {
             println!("expected emitted bytecode, did not find it");
             return false;
         }
-        
+
         let rbb_out = std::fs::read(path.clone() + ".rbb").unwrap();
-        let rbb_expected = std::fs::read(path + ".rbb").unwrap();
+        let rbb_expected = std::fs::read(path + ".rbbtestout").unwrap();
 
         if rbb_out != rbb_expected {
             println!("emitted bytecode did not match");
