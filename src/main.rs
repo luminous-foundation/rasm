@@ -162,16 +162,21 @@ fn process_test(output: Output) -> String {
 fn check_test(path: String, output: Output) -> bool {
     let path = (&path.as_str()[..path.len()-5]).to_string();
 
+    if !Path::new(&(path.clone() + ".testout")).exists() {
+        println!("\nno test out recorded for this test");
+        return false;
+    }
+
     let saved_test = fs::read_to_string(path.clone() + ".testout").expect("unreachable, failed to read test file, should already exist");
     let test_res = process_test(output);
 
     if test_res != saved_test {
-        println!("EXPECTED:\n{}\nACTUAL:\n{}", saved_test, test_res);
+        println!("\nEXPECTED:\n{}\nACTUAL:\n{}", saved_test, test_res);
     }
 
     if Path::new(&(path.clone() + ".rbbtestout")).exists() {
         if !Path::new(&(path.clone() + ".rbb")).exists() {
-            println!("expected emitted bytecode, did not find it");
+            println!("\nexpected emitted bytecode, did not find it");
             return false;
         }
 
@@ -179,12 +184,12 @@ fn check_test(path: String, output: Output) -> bool {
         let rbb_expected = std::fs::read(path + ".rbbtestout").unwrap();
 
         if rbb_out != rbb_expected {
-            println!("emitted bytecode did not match");
+            println!("\nemitted bytecode did not match");
             return false;
         }
     } else {
         if Path::new(&(path.clone() + ".rbb")).exists() {
-            println!("did not expect emitted bytecode but found it");
+            println!("\ndid not expect emitted bytecode but found it");
             return false;
         }
     }
