@@ -47,7 +47,7 @@ fn main() {
                         process::exit(1);
                     }
 
-                    assemble(args[2].clone());
+                    assemble(args[i + 1].clone());
                     i = i + 2;
                 }
                 "test" => {
@@ -62,10 +62,10 @@ fn main() {
 
                     match args[2].as_str() {
                         "run" => {
-                            tests_run(args[3].clone());
+                            tests_run(args[i + 2].clone());
                         }
                         "update" => {
-                            tests_update(args[3].clone());
+                            tests_update(args[i + 2].clone());
                         }
                         _ => {
                             printerr(format!("expected either run or update"));
