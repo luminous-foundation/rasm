@@ -348,7 +348,6 @@ fn emit_function(function: &Function, functions: &HashMap<String, Function>) -> 
     bytes.push(0xFE);
 
     let mut line_num = 0;
-    println!("{:?}", function.body_loc);
     for line in &function.body {
         match emit_line(&line, functions, &function.body_loc, line_num) {
             Ok(mut b) => bytes.append(&mut b),

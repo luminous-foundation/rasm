@@ -117,6 +117,8 @@ fn tests_run(folder: String) {
 
     println!("running tests...");
 
+    let mut pass = 0;
+    let mut fail = 0;
     match files {
         Ok(files) => {
             for file in files {
@@ -130,8 +132,10 @@ fn tests_run(folder: String) {
                                     let status: ColoredString;
                                     if check_test(path.clone(), result) {
                                         status = "passed".green().bold();
+                                        pass = pass + 1;
                                     } else {
                                         status = "failed".red().bold();
+                                        fail = fail + 1;
                                     }
                                     println!("{}: {}", path.clone(), status);
                                 }
@@ -147,6 +151,8 @@ fn tests_run(folder: String) {
             printerr(format!("failed to run tests on {} due to error\nlog:\n{}", folder, error));
         } 
     }
+
+    println!("{} passed {} failed", pass.to_string().green(), fail.to_string().red());
 }
 
 fn process_test(output: Output) -> String {
@@ -177,13 +183,17 @@ fn tests_update(folder: String) {
     let files = fs::read_dir(folder.clone());
     let current_exe = env::current_exe().expect("Failed to get current executable path").display().to_string();
 
+    let mut count = 0;
+
     match files {
         Ok(files) => {
+
             for file in files {
                 match file {
                     Ok(file) => {
                         let path = file.path().display().to_string();
                         if path.ends_with(".rasm") {
+                            count = count + 1;
                             let result = exec_test(current_exe.clone(), path.clone());
                             match result {
                                 Ok(result) => save_test(path, result),
@@ -196,9 +206,11 @@ fn tests_update(folder: String) {
             }
         }
         Err(error) => {
-            printerr(format!("failed to run tests on {} due to error\nlog:\n{}", folder, error));
+            printerr(format!("failed to update tests on {} due to error\nlog:\n{}", folder, error));
         } 
     }
+
+    println!("updated {} tests", count);
 }
 
 fn assemble(file: String) {
