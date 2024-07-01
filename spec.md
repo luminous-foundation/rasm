@@ -3,33 +3,34 @@
 ## INSTRUCTIONS
 
 ```
-[ ]   NOP
-[ ]   PUSH    [imm/var]
-[ ]   POP     [var]
-[ ]   LDARG   [imm/var]
-[ ]   CALL    [func/var]
-[ ]   ADD     [imm/var]   [imm/var]   [var]
-[ ]   SUB     [imm/var]   [imm/var]   [var]
-[ ]   MUL     [imm/var]   [imm/var]   [var]
-[ ]   DIV     [imm/var]   [imm/var]   [var]
-[ ]   JMP     [imm/var]
-[ ]   JNE     [imm/var]   [imm/var]   [imm/var]
-[ ]   JE      [imm/var]   [imm/var]   [imm/var]
-[ ]   JGE     [imm/var]   [imm/var]   [imm/var]
-[ ]   JG      [imm/var]   [imm/var]   [imm/var]
-[ ]   JLE     [imm/var]   [imm/var]   [imm/var]
-[ ]   JL      [imm/var]   [imm/var]   [imm/var]
-[ ]   MOV     [imm/var]   [var]
-[ ]   AND     [imm/var]   [imm/var]   [var]
-[ ]   OR      [imm/var]   [imm/var]   [var]
-[ ]   XOR     [imm/var]   [imm/var]   [var]
-[ ]   NOT     [imm/var]   [var]
-[ ]   LSH     [imm/var]   [imm/var]   [var]
-[ ]   RSH     [imm/var]   [imm/var]   [var]
-[ ]   VAR     [type/var]  [name]
-[ ]   RET     [imm/var]
-[ ]   DEREF   [ptr]       [var]
-[ ]   REF     [var]       [ptr]
+[ ]   NOP                                           Does nothing.
+[ ]   PUSH    [imm/var]                             Pushes a value onto the stack
+[ ]   POP     [var]                                 Pops a value off of the stack and stores it in a variable
+[ ]   LDARG   [imm/var]                             Loads an argument to be used in a function
+[ ]   CALL    [func/var]                            Calls a function
+[ ]   ADD     [imm/var]   [imm/var]   [var]         Add two numbers and store in a variable
+[ ]   SUB     [imm/var]   [imm/var]   [var]         Subtract two numbers and store in a variable
+[ ]   MUL     [imm/var]   [imm/var]   [var]         Multiply two numbers and store in a variable
+[ ]   DIV     [imm/var]   [imm/var]   [var]         Divide two numbers and store in a variable
+[ ]   JMP     [imm/var]                             Jump to a location within the current scope
+[ ]   JNE     [imm/var]   [imm/var]   [imm/var]     Jump to a location within the current scope if the given values are not equal
+[ ]   JE      [imm/var]   [imm/var]   [imm/var]     Jump to a location within the current scope if the given values are equal
+[ ]   JGE     [imm/var]   [imm/var]   [imm/var]     Jump to a location within the current scope if value A is greater than or equal to B
+[ ]   JG      [imm/var]   [imm/var]   [imm/var]     Jump to a location within the current scope if value A is greater than to B
+[ ]   JLE     [imm/var]   [imm/var]   [imm/var]     Jump to a location within the current scope if value A is less than or equal to B
+[ ]   JL      [imm/var]   [imm/var]   [imm/var]     Jump to a location within the current scope if value A is less than to B
+[ ]   MOV     [imm/var]   [var]                     Move a value into a variable
+[ ]   AND     [imm/var]   [imm/var]   [var]         Perform bitwise AND on two values and store in a variable
+[ ]   OR      [imm/var]   [imm/var]   [var]         Perform bitwise OR on two values and store in a variable
+[ ]   XOR     [imm/var]   [imm/var]   [var]         Perform bitwise XOR on two values and store in a variable
+[ ]   NOT     [imm/var]   [var]                     Perform bitwise NOT on a value and store in a variable
+[ ]   LSH     [imm/var]   [imm/var]   [var]         Left shift value A value B bits
+[ ]   RSH     [imm/var]   [imm/var]   [var]         Right shift value A value B bits
+[ ]   VAR     [type/var]  [name]                    Create a variable with the given type and name
+[ ]   RET     {imm/var}                             Return from a function (functions with void type do not need to include arguments)
+[ ]   DEREF   [ptr]       [var]                     Dereference a pointer and store in a variable
+[ ]   REF     [var]       [ptr var]                 Create a reference to a variable and store in another variable
+[ ]   STRUCT  [name/var]  [var]                     Instantiate a struct with empty values
 ```
 
 ## TYPES
@@ -155,6 +156,10 @@ An example struct would look like this
     f32 b
     char* txt
 }
+```
+The values within structs are accessed through the normal instructions used for variables, with the format of
+```
+(struct instance name).(field)
 ```
 
 ## ERRORS
