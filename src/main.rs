@@ -2,7 +2,7 @@ use std::{env, fs::{self, File}, io::Write, path::Path, process::{self, Command,
 
 use lazy_static::lazy_static;
 
-use colored::Colorize;
+use colored::{ColoredString, Colorize};
 use error::{printerr, Loc};
 use parser::parse;
 use tokenizer::{tokenize, Token};
@@ -127,11 +127,11 @@ fn tests_run(folder: String) {
                             let result = exec_test(current_exe.clone(), path.clone());
                             match result {
                                 Ok(result) => {
-                                    let status: &str;
+                                    let status: ColoredString;
                                     if check_test(path.clone(), result) {
-                                        status = "passed";
+                                        status = "passed".green().bold();
                                     } else {
-                                        status = "failed";
+                                        status = "failed".red().bold();
                                     }
                                     println!("{}: {}", path.clone(), status);
                                 }
