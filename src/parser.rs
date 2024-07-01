@@ -616,8 +616,6 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
     return Ok(functions);
 }
 
-// TODO: better error handling
-// (print location and file)
 fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Macro>, Error> {
     let mut macros: HashMap<String, Macro> = HashMap::new();
 
