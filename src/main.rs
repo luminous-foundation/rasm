@@ -219,6 +219,10 @@ fn save_test(path: String, output: Output) {
 
     if Path::new(&(path.clone() + ".rbb")).exists() {
         let _ = fs::rename(path.clone() + ".rbb", path + ".rbbtestout");
+    } else {
+        if Path::new(&(path.clone() + ".rbbtestout")).exists() {
+            let _ = fs::remove_file(path.clone() + ".rbbtestout");
+        }
     }
 }
 
