@@ -68,6 +68,24 @@ pub enum Token {
     IDENT(String),
 }
 
+macro_rules! push_type {
+    ($tokens:expr, $cur_token:expr, $locs:expr, $loc:expr, $temp_type:expr, $in_type:expr) => {
+        if is_type(&$cur_token) {
+            $locs.push($loc.clone());
+            $loc.col = $loc.col + $cur_token.len();
+
+            $temp_type.push(*TYPE_MAP.get(&$cur_token.to_uppercase()[..]).unwrap());
+            $cur_token = String::from("");
+            $in_type = true;
+        } else if $in_type {
+            $in_type = false;
+            $temp_type.reverse();
+            $tokens.push(Token::TYPE($temp_type.clone()));
+            $temp_type.clear();
+        }
+    };
+}
+
 macro_rules! push {
     ($tokens:expr, $locs:expr, $cur_token:expr, $in_num:expr, $loc:expr) => {
         if $cur_token.len() > 0 {
@@ -100,20 +118,6 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
     let mut temp_type: Vec<Type> = Vec::new();
 
     for c in line.chars() {
-        if is_type(&cur_token) {
-            locs.push(loc.clone());
-            loc.col = loc.col + cur_token.len();
-
-            temp_type.push(*TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap());
-            cur_token = String::from("");
-            in_type = true;
-        } else if in_type {
-            in_type = false;
-            temp_type.reverse();
-            tokens.push(Token::TYPE(temp_type.clone()));
-            temp_type.clear();
-        }
-
         if !in_str {
             match c {
                 '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => { // TODO: float support
@@ -123,6 +127,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     cur_token.push(c);
                 }
                 '(' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::LPAREN);
 
@@ -130,6 +135,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     loc.col = loc.col + 1;
                 }
                 ')' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::RPAREN);
 
@@ -137,6 +143,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     loc.col = loc.col + 1;
                 }
                 '{' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::LCURLY);
 
@@ -144,6 +151,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     loc.col = loc.col + 1;
                 }
                 '}' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::RCURLY);
 
@@ -151,6 +159,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     loc.col = loc.col + 1;
                 }
                 '[' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::LSQUARE);
 
@@ -158,6 +167,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     loc.col = loc.col + 1;
                 }
                 ']' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::RSQUARE);
 
@@ -171,6 +181,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     if in_num {
                         cur_token.push(c);
                     } else {
+                        push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                         push!(tokens, locs, cur_token, in_num, loc);
                         tokens.push(Token::DOT);
 
@@ -179,13 +190,32 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     }
                 }
                 ',' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                     tokens.push(Token::COMMA);
 
                     locs.push(loc.clone());
                     loc.col = loc.col + 1;
                 }
+                '*' => {
+                    if is_type(&cur_token) {
+                        locs.push(loc.clone());
+                        loc.col = loc.col + cur_token.len();
+
+                        temp_type.push(*TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap());
+                        cur_token = String::from("");
+                        in_type = true;
+                    } else if in_type {
+                        in_type = false;
+                        temp_type.reverse();
+                        tokens.push(Token::TYPE(temp_type.clone()));
+                        temp_type.clear();
+                    }
+
+                    temp_type.push(Type::POINTER);
+                }
                 ' ' | '\r' | '\n' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                 }
                 ';' => {
