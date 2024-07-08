@@ -1,6 +1,6 @@
 use crate::{error::Loc, tokenizer::{Token, Type}};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub loc: Loc,
 

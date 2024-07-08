@@ -14,6 +14,8 @@ mod function;
 mod data;
 mod conversion;
 mod error;
+mod _struct;
+mod number;
 
 lazy_static! {
     static ref DEBUG: Mutex<u8> = Mutex::new(0);
@@ -26,6 +28,8 @@ static MACRO_DEPTH_LIMIT: u16 = 16;
 // TODO: structs
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    let mut timing = false;
     if args.len() > 1 {
         let mut i = 1;
         while i < args.len() {
@@ -41,13 +45,17 @@ fn main() {
 
                     i = i + 2;
                 }
+                "--time" => {
+                    timing = true;
+                    i = i + 1;
+                }
                 "assemble" => {
                     if args.len() - i < 2 {
                         printerr(format!("expected input file"));
                         process::exit(1);
                     }
 
-                    assemble(args[i + 1].clone());
+                    assemble(args[i + 1].clone(), timing);
                     i = i + 2;
                 }
                 "test" => {
@@ -93,6 +101,7 @@ fn usage() {
     println!("Usage:");
     println!("Flags");
     println!("  --debug  [level]                sets the debug level (0-2)");
+    println!("  --time                          enables assembly timing");
     println!("Subcommands");
     println!("  help                            prints this subcommand list");
     println!("  assemble [file]                 assembles the given rasm file to rbb file");
@@ -244,8 +253,8 @@ fn tests_update(folder: String) {
     println!("updated {} tests", count);
 }
 
-fn assemble(file: String) {
-    // let start = std::time::Instant::now();
+fn assemble(file: String, timing: bool) {
+    let start = std::time::Instant::now();
 
     if !file.ends_with(".rasm") {
         eprintln!("{} expected `*.rasm` file, got `{}`", "ERROR:".red().bold().underline(), file);
@@ -280,7 +289,10 @@ fn assemble(file: String) {
     let rbb_file = "./".to_string() + &file_path.clone() + ".rbb";
 
     let bytes = parse(tokens, locations);
-    // println!("assembly took {:.2}ms", start.elapsed().as_secs_f32() * 1000f32);
+
+    if timing {
+        println!("assembly took {:.2}ms", start.elapsed().as_secs_f32() * 1000f32);
+    }
 
     if Path::new(&rbb_file).exists() {
        fs::remove_file(rbb_file.clone()).unwrap();

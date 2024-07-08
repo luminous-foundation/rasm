@@ -1,0 +1,23 @@
+.struct Foo {
+    i32 a
+    f32 b
+    char* txt
+}
+
+void main() {
+    VAR struct foo
+    INST Foo foo
+    MOV 1 foo.a
+    MOV 2.3 foo.b
+    MOV text foo.txt
+
+    LDARG foo.a
+    CALL io_print
+    LDARG foo.b
+    CALL io_print
+    LDARG foo.txt
+    CALL io_print
+}
+
+.data
+text char* "Hello, World!"

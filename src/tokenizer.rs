@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use lazy_static::lazy_static;
 
-use crate::error::Loc;
+use crate::{error::Loc, number::Number};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
@@ -54,7 +54,7 @@ fn is_type(input: &str) -> bool {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    NUMBER(u128),
+    NUMBER(Number),
     TYPE(Vec<Type>),
     LPAREN,
     RPAREN,
@@ -75,7 +75,7 @@ macro_rules! push {
             $loc.col = $loc.col + $cur_token.len();
 
             if($in_num) {
-                $tokens.push(Token::NUMBER($cur_token.parse::<u128>().unwrap()));
+                $tokens.push(Token::NUMBER(Number::from_str(&$cur_token).unwrap()));
                 $in_num = false;
             } else {
                 $tokens.push(Token::IDENT($cur_token));
@@ -98,6 +98,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
 
     let mut in_type = false;
     let mut temp_type: Vec<Type> = Vec::new();
+
     for c in line.chars() {
         if is_type(&cur_token) {
             locs.push(loc.clone());
@@ -167,11 +168,15 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     in_str = true;
                 }
                 '.' => {
-                    push!(tokens, locs, cur_token, in_num, loc);
-                    tokens.push(Token::DOT);
+                    if in_num {
+                        cur_token.push(c);
+                    } else {
+                        push!(tokens, locs, cur_token, in_num, loc);
+                        tokens.push(Token::DOT);
 
-                    locs.push(loc.clone());
-                    loc.col = loc.col + 1;
+                        locs.push(loc.clone());
+                        loc.col = loc.col + 1;
+                    }
                 }
                 ',' => {
                     push!(tokens, locs, cur_token, in_num, loc);

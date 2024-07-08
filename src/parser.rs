@@ -3,6 +3,7 @@ use std::process;
 
 use lazy_static::lazy_static;
 
+use crate::_struct::Struct;
 use crate::conversion::{convert_bytecode_string, convert_number, convert_string, convert_type, get_bytes_needed};
 use crate::data::Data;
 use crate::error::{Error, Loc, Note};
@@ -41,21 +42,24 @@ lazy_static! {
         m.insert("RET", 0x64);
         m.insert("DEREF", 0x66);
         m.insert("REF", 0x67);
+        m.insert("INST", 0x68);
         m
     };
 }
 
 // TODO: show where errors expanded from
-pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
+pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     let debug = *DEBUG.lock().unwrap();
 
     let mut result: Vec<u8> = Vec::new();
+
+    let mut vars: Vec<String> = Vec::new();
 
     let mut macros;
     match parse_macros(&toks, &locs) {
         Ok(list) => macros = list,
         Err(error) => {
-            eprintln!("{}", error);
+            eprintln!("error while parsing macros:\n{}", error);
             process::exit(1);
         }
     }
@@ -68,7 +72,7 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     match parse_functions(&toks, &locs) {
         Ok(list) => functions = list,
         Err(error) => {
-            eprintln!("{}", error);
+            eprintln!("error while parsing functions:\n{}", error);
             process::exit(1);
         }
     }
@@ -81,13 +85,26 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     match parse_data(&toks, &locs) {
         Ok(t) => data = t,
         Err(error) => {
-            eprintln!("{}", error);
+            eprintln!("error while parsing data section:\n{}", error);
             process::exit(1);
         }
     }
 
     if debug >= 1 {
         println!("parsed {} data value(s), {:#?}", data.len(), data);
+    }
+
+    let structs;
+    match parse_structs(&toks, &locs) {
+        Ok(s) => structs = s,
+        Err(error) => {
+            eprintln!("error while parsing structs:\n{}", error);
+            process::exit(1);
+        }
+    }
+
+    if debug >= 1 {
+        println!("parsed {} struct(s), {:#?}", structs.len(), structs);
     }
 
     // these two loops would all be a function if the borrow checker let me
@@ -260,14 +277,18 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         i = i + 1;
     }
 
-    if debug >= 1 {
-        println!("after macro resolution...");
-        println!("parsed {} macro(s), {:#?}", macros.len(), macros);
-        println!("parsed {} functions(s), {:#?}", functions.len(), functions);
-        // println!("locs\n");
-        // for i in 0..locs.len() {
-        //     println!("{:?}", locs[i]);
-        // }
+    // if debug >= 1 {
+    //     println!("after macro resolution...");
+    //     println!("parsed {} macro(s), {:?}", macros.len(), macros);
+    //     println!("parsed {} functions(s), {:?}", functions.len(), functions);
+    //     // println!("locs\n");
+    //     // for i in 0..locs.len() {
+    //     //     println!("{:?}", locs[i]);
+    //     // }
+    // }
+
+    for (_, _struct) in structs {
+        emit_struct(&_struct);
     }
 
     let mut i = 0;
@@ -275,17 +296,17 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
 
     let mut in_top_level = true;
     while i < toks.len() {
-        let line = &toks[i];
+        let mut line = &mut toks[i];
 
         if functional_tokens.iter().any(|token| line.contains(token)) {
             in_top_level = false;
         }
 
         if in_top_level {
-            match emit_line(line, &functions, &locs, i) {
+            match emit_line(&mut line, &functions, &locs, i, &mut vars) {
                 Ok(mut bytes) => result.append(&mut bytes),
                 Err(error) => {
-                    eprintln!("{}", error);
+                    eprintln!("error while parsing emitting line:\n{}", error);
                     process::exit(1);
                 }
             }
@@ -294,11 +315,11 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         i = i + 1;
     }
 
-    for (_, function) in &functions {
-        match emit_function(&function, &functions) {
+    for (_, mut function) in &mut (functions.clone()) {
+        match emit_function(&mut function, &functions, &vars) {
             Ok(mut bytes) => result.append(&mut bytes),
             Err(error) => {
-                eprintln!("{}", error);
+                eprintln!("error while parsing emitting function:\n{}", error);
                 process::exit(1);
             }
         }
@@ -314,13 +335,30 @@ pub fn parse(toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     return result;
 }
 
+fn emit_struct(_struct: &Struct) -> Vec<u8> {
+    let mut bytes: Vec<u8> = Vec::new();
+
+    bytes.push(0xFB);
+    bytes.append(&mut convert_bytecode_string(&_struct.name));
+    bytes.push(0xFE);
+
+    for i in 0.._struct.var_types.len() {
+        bytes.append(&mut convert_type(&_struct.var_types[i]));
+        bytes.append(&mut &mut convert_bytecode_string(&_struct.var_names[i]));
+    }
+
+    bytes.push(0xFD);
+    
+    return bytes;
+}
+
 fn emit_data(data: &Data) -> Vec<u8> {
     let mut bytes: Vec<u8> = Vec::new();
 
     bytes.append(&mut convert_bytecode_string(&data.name));
     bytes.append(&mut convert_type(&data._type));
-    bytes.push(get_bytes_needed(data.data.len() as u128));
-    bytes.append(&mut convert_number(data.data.len() as u128));
+    bytes.push(get_bytes_needed((data.data.len() as u64).into()));
+    bytes.append(&mut convert_number((data.data.len() as u64).into()));
     
     for b in &data.data {
         bytes.push(*b);
@@ -329,8 +367,10 @@ fn emit_data(data: &Data) -> Vec<u8> {
     return bytes;
 }
 
-fn emit_function(function: &Function, functions: &HashMap<String, Function>) -> Result<Vec<u8>, Error> {
+fn emit_function(function: &mut Function, functions: &HashMap<String, Function>, vars: &Vec<String>) -> Result<Vec<u8>, Error> {
     let mut bytes: Vec<u8> = Vec::new();
+
+    let mut local_vars = vars.clone();
 
     bytes.push(0xFF);
     
@@ -348,8 +388,8 @@ fn emit_function(function: &Function, functions: &HashMap<String, Function>) -> 
     bytes.push(0xFE);
 
     let mut line_num = 0;
-    for line in &function.body {
-        match emit_line(&line, functions, &function.body_loc, line_num) {
+    for mut line in &mut function.body {
+        match emit_line(&mut line, functions, &function.body_loc, line_num, &mut local_vars) {
             Ok(mut b) => bytes.append(&mut b),
             Err(error) => return Err(error)
         }
@@ -361,8 +401,41 @@ fn emit_function(function: &Function, functions: &HashMap<String, Function>) -> 
     return Ok(bytes);
 }
 
-fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>, locs: &Vec<Vec<Loc>>, line_num: usize) -> Result<Vec<u8>, Error> {
+fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs: &Vec<Vec<Loc>>, line_num: usize, vars: &mut Vec<String>) -> Result<Vec<u8>, Error> {
     let mut bytes: Vec<u8> = Vec::new();
+
+    let mut i = 1;
+    while i < line.len() { // this is to merge all x.y identifiers into one
+        match &line[i] {
+            Token::DOT => {
+                match &line[i - 1] {
+                    Token::IDENT(n) => {
+                        match &line[i + 1] { // matches in matches in matches
+                            Token::IDENT(n2) => {
+                                let new_ident = n.to_string() + "." + n2;
+                                line.remove(i - 1);
+                                line.remove(i - 1);
+                                line.remove(i - 1);
+                                line.insert(i - 1, Token::IDENT(new_ident));
+                                i = i - 1;
+                            }
+                            _ => return Err(Error {
+                                loc: locs[line_num][i + 1].clone(),
+                                message: format!("unexpected token `{:?}`, expected `IDENT`", line[i + 1])
+                            })
+                        }
+                    }
+                    _ => return Err(Error {
+                        loc: locs[line_num][i - 1].clone(),
+                        message: format!("unexpected token `{:?}`, expected `IDENT`", line[i - 1])
+                    })
+                }
+            }
+            _ => ()
+        }
+
+        i = i + 1;
+    }
 
     if line.len() > 0 {
         match &line[0] {
@@ -392,6 +465,40 @@ fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>, locs: &Ve
                             _ => return Err(Error {
                                 loc: locs[line_num][1].clone(),
                                 message: format!("unexpected token `{:?}`, expected `IDENT`", line[1])
+                            })
+                        }
+                    }
+                    "VAR" => { // VAR is special ([type/var] [name])
+                        match &line[1] {
+                            Token::TYPE(_) => variation = 0,
+                            Token::IDENT(_) => variation = 1,
+                            _ => return Err(Error {
+                                loc: locs[line_num][1].clone(),
+                                message: format!("unexpected token `{:?}`, expected `TYPE` or `IDENT`", line[1])
+                            })
+                        }
+                        match &line[2] {
+                            Token::IDENT(n) => {
+                                vars.push(n.clone());
+                            }
+                            _ => return Err(Error {
+                                loc: locs[line_num][2].clone(),
+                                message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
+                            })
+                        }
+                    }
+                    "INST" => { // INST is special ([name/var] [var])
+                        match &line[1] {
+                            Token::IDENT(n) => {
+                                if vars.contains(n) {
+                                    variation = 1;
+                                } else {
+                                    variation = 0;
+                                }
+                            }
+                            _ => return Err(Error {
+                                loc: locs[line_num][2].clone(),
+                                message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
                             })
                         }
                     }
@@ -428,7 +535,7 @@ fn emit_line(line: &Vec<Token>, functions: &HashMap<String, Function>, locs: &Ve
 fn emit_token(token: &Token, bytes: &mut Vec<u8>) -> Result<(), String> {
     match token {
         Token::IDENT(str) => bytes.append(&mut convert_bytecode_string(str)),
-        Token::NUMBER(n) => bytes.append(&mut convert_number(*n)),
+        Token::NUMBER(n) => bytes.append(&mut convert_number(n.clone())),
         Token::TYPE(t) => bytes.append(&mut convert_type(t)),
         _ => return Err(format!("unexpected token `{:?}`, expected `IDENT`, `NUMBER` or `TYPE`", token))
     }
@@ -447,6 +554,83 @@ fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
     }
 
     return Ok(variation);
+}
+
+fn parse_structs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Struct>, Error> {
+    let mut structs: HashMap<String, Struct> = HashMap::new();
+
+    let debug = *DEBUG.lock().unwrap();
+
+    let mut i = 0;
+    while i < toks.len() {
+        let line = &toks[i];
+
+        if line.len() >= 2 {
+            // i would rather this be IDENT("struct") instead of TYPE(struct) but whatever the assembler doesn't care
+            if line[0] == Token::DOT && line[1] == Token::TYPE(vec!(Type::STRUCT)) {
+                if !line.contains(&Token::LCURLY) && !&toks[i + 1].contains(&Token::LCURLY) {
+                    return Err(Error {
+                        loc: locs[i][0].clone(),
+                        message: "struct does not have open curly".to_string()
+                    });
+                }
+
+                let name;
+                match &line[2] {
+                    Token::IDENT(n) => name = n,
+                    _ => {
+                        return Err(Error {
+                            loc: locs[i][2].clone(),
+                            message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
+                        });
+                    }
+                }
+
+                if debug >= 1 {
+                    println!("found struct named {}", name);
+                }
+
+                i = i + 1;
+
+                let mut _struct = Struct {name: name.clone(), var_names: Vec::new(), var_types: Vec::new()};
+                while !toks[i].contains(&Token::RCURLY) {
+                    let line = &toks[i];
+                    
+                    let _type;
+                    match &line[0] {
+                        Token::TYPE(t) => _type = t,
+                        _ =>  {
+                            return Err(Error {
+                                loc: locs[i][0].clone(),
+                                message: format!("unexpected token `{:?}`, expected `TYPE`", line[2])
+                            });
+                        }
+                    }
+
+                    let name;
+                    match &line[1] {
+                        Token::IDENT(n) => name = n,
+                        _ =>  {
+                            return Err(Error {
+                                loc: locs[i][1].clone(),
+                                message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
+                            });
+                        }
+                    }
+
+                    _struct.var_names.push(name.clone());
+                    _struct.var_types.push(_type.clone());
+                    i = i + 1;
+                }
+
+                structs.insert(name.clone(), _struct);
+            }
+        }
+
+        i = i + 1;
+    }
+
+    return Ok(structs);
 }
 
 fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Data>, Error> {
@@ -486,7 +670,7 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
 
             let bytes: Vec<u8>;
             match &line[2] { // i'm just going to implement this as i go along
-                Token::NUMBER(n) => bytes = convert_number(*n),
+                Token::NUMBER(n) => bytes = convert_number(n.clone()),
                 Token::TYPE(t) => bytes = convert_type(t),
                 Token::LPAREN => todo!(),
                 Token::RPAREN => todo!(),
