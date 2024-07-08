@@ -25,7 +25,6 @@ static MACRO_DEPTH_LIMIT: u16 = 16;
 
 // TODO: file importing
 // TODO: labels
-// TODO: structs
 fn main() {
     let args: Vec<String> = env::args().collect();
 
