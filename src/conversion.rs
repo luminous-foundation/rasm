@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use crate::tokenizer::Type;
+use crate::{number::Number, tokenizer::Type};
 
+use half::f16;
 use lazy_static::lazy_static;
 
 lazy_static! {
@@ -42,13 +43,31 @@ pub fn convert_bytecode_string(text: &String) -> Vec<u8> {
 
 // TODO: implement
 // TODO: squeeze number into smaller value
-pub fn convert_number(n: u128) -> Vec<u8> {
+pub fn convert_number(n: Number) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
 
-    let bytes = n.to_ne_bytes();
-    for i in 0..get_bytes_needed(n) {
-        res.push(bytes[i as usize]);
+    let _type = get_type(&n);
+
+    let mut bytes: Vec<u8>;
+
+    match _type {
+        0x01 => bytes = (Into::<i64>::into(n.clone()) as i8).to_ne_bytes().to_vec(),
+        0x02 => bytes = (Into::<i64>::into(n.clone()) as i16).to_ne_bytes().to_vec(),
+        0x03 => bytes = (Into::<i64>::into(n.clone()) as i32).to_ne_bytes().to_vec(),
+        0x04 => bytes = (Into::<i64>::into(n.clone()) as i64).to_ne_bytes().to_vec(),
+        0x05 => bytes = (Into::<u64>::into(n.clone()) as u8).to_ne_bytes().to_vec(),
+        0x06 => bytes = (Into::<u64>::into(n.clone()) as u16).to_ne_bytes().to_vec(),
+        0x07 => bytes = (Into::<u64>::into(n.clone()) as u32).to_ne_bytes().to_vec(),
+        0x08 => bytes = (Into::<u64>::into(n.clone()) as u64).to_ne_bytes().to_vec(),
+        0x09 => bytes = (f16::from_f64(Into::<f64>::into(n.clone()))).to_ne_bytes().to_vec(),
+        0x0A => bytes = (Into::<f64>::into(n.clone()) as f32).to_ne_bytes().to_vec(),
+        0x0B => bytes = (Into::<f64>::into(n.clone()) as f64).to_ne_bytes().to_vec(),
+        _ => panic!("unreachable")
     }
+
+    res.push(_type);
+
+    res.append(&mut bytes);
 
     return res;
 }
@@ -63,6 +82,15 @@ pub fn convert_type(_type: &Vec<Type>) -> Vec<u8> {
     return res;
 }
 
-pub fn get_bytes_needed(n: u128) -> u8 {
-    return ((n as f32 + 1.).log2() / 8.0).ceil() as u8;
+pub fn get_bytes_needed(n: Number) -> u8 {
+    return ((Into::<f64>::into(n) + 1.).log2() / 8.0).ceil() as u8;
+}
+
+// TODO: squeeze into smallest type
+pub fn get_type(n: &Number) -> u8 {
+    match n {
+        Number::SIGNED(_) => 0x04,
+        Number::UNSIGNED(_) => 0x08,
+        Number::FLOAT(_) => 0x0B,
+    }
 }

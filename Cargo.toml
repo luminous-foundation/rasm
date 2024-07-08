@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 lazy_static = "1.4.0"
 colored = "2.1.0"
+half = "2.4.1"
