@@ -30,7 +30,7 @@
 [ ]   RET     {imm/var}                             Return from a function (functions with void type do not need to include arguments)
 [ ]   DEREF   [ptr]       [var]                     Dereference a pointer and store in a variable
 [ ]   REF     [var]       [ptr var]                 Create a reference to a variable and store in another variable
-[ ]   STRUCT  [name/var]  [var]                     Instantiate a struct with empty values
+[ ]   INST    [name/var]  [var]                     Instantiate a struct with empty values
 ```
 
 ## TYPES
