@@ -1,4 +1,4 @@
-use std::{env, fs::{self, File}, io::Write, path::Path, process::{self, Command, Output}, sync::Mutex};
+use std::{env, fs::{self, metadata, File}, io::Write, path::Path, process::{self, Command, Output}, sync::Mutex};
 
 use lazy_static::lazy_static;
 
@@ -72,7 +72,11 @@ fn main() {
                             tests_run(args[i + 2].clone());
                         }
                         "update" => {
-                            tests_update(args[i + 2].clone());
+                            if metadata(args[i + 2].clone()).unwrap().is_dir() {
+                                tests_update(args[i + 2].clone());
+                            } else {
+                                update_singular(args[i + 2].clone());
+                            }
                         }
                         _ => {
                             printerr(format!("expected either run or update"));
@@ -121,7 +125,7 @@ fn exec_test(self_path: String, file: String) -> Result<Output, String> {
 
 fn tests_run(folder: String) {
     let files = fs::read_dir(folder.clone());
-    let current_exe = env::current_exe().expect("Failed to get current executable path").display().to_string();
+    let current_exe = env::current_exe().expect("failed to get current executable path").display().to_string();
 
     println!("running tests...");
 
@@ -218,15 +222,28 @@ fn save_test(path: String, output: Output) {
     }
 }
 
+fn update_singular(test: String) {
+    let current_exe = env::current_exe().expect("Failed to get current executable path").display().to_string();
+
+    if test.ends_with(".rasm") {
+        let result = exec_test(current_exe.clone(), test.clone());
+        match result {
+            Ok(result) => save_test(test.clone(), result),
+            Err(error) => printerr(error)
+        }
+    }
+
+    println!("updated test {}", test);
+}
+
 fn tests_update(folder: String) {
     let files = fs::read_dir(folder.clone());
-    let current_exe = env::current_exe().expect("Failed to get current executable path").display().to_string();
+    let current_exe = env::current_exe().expect("failed to get current executable path").display().to_string();
 
     let mut count = 0;
 
     match files {
         Ok(files) => {
-
             for file in files {
                 match file {
                     Ok(file) => {
