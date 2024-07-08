@@ -288,7 +288,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     // }
 
     for (_, _struct) in structs {
-        emit_struct(&_struct);
+        result.append(&mut emit_struct(&_struct));
     }
 
     let mut i = 0;
@@ -344,7 +344,7 @@ fn emit_struct(_struct: &Struct) -> Vec<u8> {
 
     for i in 0.._struct.var_types.len() {
         bytes.append(&mut convert_type(&_struct.var_types[i]));
-        bytes.append(&mut &mut convert_bytecode_string(&_struct.var_names[i]));
+        bytes.append(&mut convert_bytecode_string(&_struct.var_names[i]));
     }
 
     bytes.push(0xFD);
