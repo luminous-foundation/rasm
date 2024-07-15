@@ -453,6 +453,26 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                             })
                         }
                     }
+                    "ADD" | "SUB" | "MUL" | "DIV" | "AND" | "OR" | "XOR" | "LSH" | "RSH" => { // all [imm/var] [imm/var] instructions
+                        match get_variation(&line, 2) {
+                            Ok(v) => variation = v,
+                            Err(err) => 
+                            return Err(Error { 
+                                loc: locs[line_num][0].clone(),
+                                message: err
+                            })
+                        }
+                    }
+                    "JNE" | "JE" | "JGE" | "JG" | "JLE" | "JL" => { // all [imm/var] [imm/var] [imm/var] instructions
+                        match get_variation(&line, 3) {
+                            Ok(v) => variation = v,
+                            Err(err) => 
+                            return Err(Error { 
+                                loc: locs[line_num][0].clone(),
+                                message: err
+                            })
+                        }
+                    }
                     "CALL" => { // CALL is special ([func/var])
                         match &line[1] {
                             Token::IDENT(ident) => {
