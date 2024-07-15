@@ -1,5 +1,3 @@
-void main() {
-    VAR u32 a
-    ADD 1 2 a
-    PUSH a
-}
+VAR u32 a
+ADD 1 2 a
+PUSH a
