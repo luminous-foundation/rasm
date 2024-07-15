@@ -565,8 +565,9 @@ fn emit_token(token: &Token, bytes: &mut Vec<u8>) -> Result<(), String> {
 
 fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
     let mut variation = 0;
+
     for i in 0..amnt {
-        match line[i] {
+        match &line[i + 1] {
             Token::IDENT(_) => variation = variation | (1 << i),
             Token::NUMBER(_) => (),
             _ => return Err(format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[i]))
