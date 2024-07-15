@@ -51,17 +51,17 @@ pub fn convert_number(n: Number) -> Vec<u8> {
     let mut bytes: Vec<u8>;
 
     match _type {
-        0x01 => bytes = (Into::<i64>::into(n.clone()) as i8).to_ne_bytes().to_vec(),
-        0x02 => bytes = (Into::<i64>::into(n.clone()) as i16).to_ne_bytes().to_vec(),
-        0x03 => bytes = (Into::<i64>::into(n.clone()) as i32).to_ne_bytes().to_vec(),
-        0x04 => bytes = (Into::<i64>::into(n.clone()) as i64).to_ne_bytes().to_vec(),
-        0x05 => bytes = (Into::<u64>::into(n.clone()) as u8).to_ne_bytes().to_vec(),
-        0x06 => bytes = (Into::<u64>::into(n.clone()) as u16).to_ne_bytes().to_vec(),
-        0x07 => bytes = (Into::<u64>::into(n.clone()) as u32).to_ne_bytes().to_vec(),
-        0x08 => bytes = (Into::<u64>::into(n.clone()) as u64).to_ne_bytes().to_vec(),
-        0x09 => bytes = (f16::from_f64(Into::<f64>::into(n.clone()))).to_ne_bytes().to_vec(),
-        0x0A => bytes = (Into::<f64>::into(n.clone()) as f32).to_ne_bytes().to_vec(),
-        0x0B => bytes = (Into::<f64>::into(n.clone()) as f64).to_ne_bytes().to_vec(),
+        0x01 => bytes = (Into::<i64>::into(n.clone()) as i8).to_be_bytes().to_vec(),
+        0x02 => bytes = (Into::<i64>::into(n.clone()) as i16).to_be_bytes().to_vec(),
+        0x03 => bytes = (Into::<i64>::into(n.clone()) as i32).to_be_bytes().to_vec(),
+        0x04 => bytes = (Into::<i64>::into(n.clone()) as i64).to_be_bytes().to_vec(),
+        0x05 => bytes = (Into::<u64>::into(n.clone()) as u8).to_be_bytes().to_vec(),
+        0x06 => bytes = (Into::<u64>::into(n.clone()) as u16).to_be_bytes().to_vec(),
+        0x07 => bytes = (Into::<u64>::into(n.clone()) as u32).to_be_bytes().to_vec(),
+        0x08 => bytes = (Into::<u64>::into(n.clone()) as u64).to_be_bytes().to_vec(),
+        0x09 => bytes = (f16::from_f64(Into::<f64>::into(n.clone()))).to_be_bytes().to_vec(),
+        0x0A => bytes = (Into::<f64>::into(n.clone()) as f32).to_be_bytes().to_vec(),
+        0x0B => bytes = (Into::<f64>::into(n.clone()) as f64).to_be_bytes().to_vec(),
         _ => panic!("unreachable")
     }
 
