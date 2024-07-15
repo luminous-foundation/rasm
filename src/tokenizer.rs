@@ -214,7 +214,7 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
 
                     temp_type.push(Type::POINTER);
                 }
-                ' ' | '\r' | '\n' => {
+                ' ' | '\r' | '\n' | '\t' => {
                     push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push!(tokens, locs, cur_token, in_num, loc);
                 }
