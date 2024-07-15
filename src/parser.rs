@@ -443,7 +443,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                 let variation: u8;
                 match instr.to_ascii_uppercase().as_str() {
                     "NOP" | "POP" | "DEREF" | "REF" => variation = 0, // all non-variant instructions
-                    "PUSH" | "LDARG" | "JMP" | "MOV" | "NOT" | "RET" => { // all [imm/var] instructions
+                    "PUSH" | "LDARG" | "JMP" | "MOV" | "NOT" => { // all [imm/var] instructions
                         match get_variation(&line, 1) {
                             Ok(v) => variation = v,
                             Err(err) => 
@@ -505,6 +505,20 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                                 loc: locs[line_num][2].clone(),
                                 message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
                             })
+                        }
+                    }
+                    "RET" => { // RET is special {imm/var}
+                        if line.len() > 1 {
+                            match get_variation(&line, 1) {
+                                Ok(v) => variation = v + 1,
+                                Err(err) => 
+                                return Err(Error { 
+                                    loc: locs[line_num][0].clone(),
+                                    message: err
+                                })
+                            }
+                        } else {
+                            variation = 0;
                         }
                     }
                     "INST" => { // INST is special ([name/var] [var])
