@@ -92,7 +92,7 @@ macro_rules! push {
             $locs.push($loc.clone());
             $loc.col = $loc.col + $cur_token.len();
 
-            if($in_num) {
+            if $in_num {
                 $tokens.push(Token::NUMBER(Number::from_str(&$cur_token).unwrap()));
                 $in_num = false;
             } else {
@@ -236,6 +236,28 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                 }
                 _ => cur_token.push(c)
             }
+        }
+    }
+
+    // inlined to remove warnings
+    if is_type(&cur_token){
+        locs.push(loc.clone());
+        loc.col = loc.col+cur_token.len();
+        temp_type.push(*TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap());
+        cur_token = String::from("");
+    }else if in_type {
+        temp_type.reverse();
+        tokens.push(Token::TYPE(temp_type.clone()));
+        temp_type.clear();
+    }
+
+    if cur_token.len() > 0 {
+        locs.push(loc.clone());
+        loc.col = loc.col+cur_token.len();
+        if in_num {
+            tokens.push(Token::NUMBER(Number::from_str(&cur_token).unwrap()));
+        }else {
+            tokens.push(Token::IDENT(cur_token));
         }
     }
 
