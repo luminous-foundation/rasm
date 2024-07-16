@@ -306,7 +306,7 @@ fn assemble(file: String, timing: bool) {
         }
     }
 
-    let rbb_file = "./".to_string() + &file_path.clone() + ".rbb";
+    let rbb_file = file_path.clone().to_string() + ".rbb";
 
     let bytes = parse(tokens, locations);
 
