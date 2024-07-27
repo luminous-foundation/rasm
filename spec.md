@@ -20,6 +20,7 @@
 [x]   JLE     [imm/var]   [imm/var]   [imm/var]     Jump to a location within the current scope if value A is less than or equal to B
 [x]   JL      [imm/var]   [imm/var]   [imm/var]     Jump to a location within the current scope if value A is less than to B
 [x]   MOV     [imm/var]   [var]                     Move a value into a variable
+[x]   MOV_V   [var var]   [var]                     Move a dynamically named variable into a variable
 [x]   AND     [imm/var]   [imm/var]   [var]         Perform bitwise AND on two values and store in a variable
 [x]   OR      [imm/var]   [imm/var]   [var]         Perform bitwise OR on two values and store in a variable
 [x]   XOR     [imm/var]   [imm/var]   [var]         Perform bitwise XOR on two values and store in a variable
@@ -27,6 +28,7 @@
 [x]   LSH     [imm/var]   [imm/var]   [var]         Left shift value A value B bits
 [x]   RSH     [imm/var]   [imm/var]   [var]         Right shift value A value B bits
 [x]   VAR     [type/var]  [name]                    Create a variable with the given type and name
+[x]   VAR_V   [type/var]  [var]                     Create a variable with the given type and dynamic name
 [x]   RET     {imm/var}                             Return from a function (functions with void type do not need to include arguments)
 [x]   DEREF   [ptr]       [var]                     Dereference a pointer and store in a variable
 [x]   REF     [var]       [ptr var]                 Create a reference to a variable and store in another variable
