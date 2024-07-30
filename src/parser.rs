@@ -45,6 +45,7 @@ lazy_static! {
         m.insert("DEREF", 0x6A);
         m.insert("REF", 0x6C);
         m.insert("INST", 0x6D);
+        m.insert("MOD", 0x6F);
         m
     };
 }
