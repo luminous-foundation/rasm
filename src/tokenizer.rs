@@ -104,6 +104,17 @@ macro_rules! push {
     };
 }
 
+macro_rules! push_token {
+    ($token:expr, $tokens:expr, $cur_token:expr, $locs:expr, $loc:expr, $temp_type:expr, $in_type:expr, $in_num:expr) => {
+        push_type!($tokens, $cur_token, $locs, $loc, $temp_type, $in_type);
+        push!($tokens, $locs, $cur_token, $in_num, $loc);
+        $tokens.push($token);
+
+        $locs.push($loc.clone());
+        $loc.col = $loc.col + 1;
+    }
+}
+
 // TODO: character literals
 pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
     let mut tokens: Vec<Token> = Vec::new();
@@ -127,52 +138,22 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     cur_token.push(c);
                 }
                 '(' => {
-                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
-                    push!(tokens, locs, cur_token, in_num, loc);
-                    tokens.push(Token::LPAREN);
-
-                    locs.push(loc.clone());
-                    loc.col = loc.col + 1;
+                    push_token!(Token::LPAREN, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 ')' => {
-                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
-                    push!(tokens, locs, cur_token, in_num, loc);
-                    tokens.push(Token::RPAREN);
-
-                    locs.push(loc.clone());
-                    loc.col = loc.col + 1;
+                    push_token!(Token::RPAREN, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '{' => {
-                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
-                    push!(tokens, locs, cur_token, in_num, loc);
-                    tokens.push(Token::LCURLY);
-
-                    locs.push(loc.clone());
-                    loc.col = loc.col + 1;
+                    push_token!(Token::LCURLY, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '}' => {
-                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
-                    push!(tokens, locs, cur_token, in_num, loc);
-                    tokens.push(Token::RCURLY);
-
-                    locs.push(loc.clone());
-                    loc.col = loc.col + 1;
+                    push_token!(Token::RCURLY, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '[' => {
-                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
-                    push!(tokens, locs, cur_token, in_num, loc);
-                    tokens.push(Token::LSQUARE);
-
-                    locs.push(loc.clone());
-                    loc.col = loc.col + 1;
+                    push_token!(Token::LSQUARE, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 ']' => {
-                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
-                    push!(tokens, locs, cur_token, in_num, loc);
-                    tokens.push(Token::RSQUARE);
-
-                    locs.push(loc.clone());
-                    loc.col = loc.col + 1;
+                    push_token!(Token::RSQUARE, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '"' => {
                     in_str = true;
@@ -190,15 +171,10 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     }
                 }
                 ',' => {
-                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
-                    push!(tokens, locs, cur_token, in_num, loc);
-                    tokens.push(Token::COMMA);
-
-                    locs.push(loc.clone());
-                    loc.col = loc.col + 1;
+                    push_token!(Token::COMMA, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '*' => {
-                    if is_type(&cur_token) {
+                    if is_type(&cur_token) { // TODO: this could be smaller
                         locs.push(loc.clone());
                         loc.col = loc.col + cur_token.len();
 
