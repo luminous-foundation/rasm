@@ -32,20 +32,18 @@ lazy_static! {
         m.insert("JLE", 0x3A);
         m.insert("JL", 0x42);
         m.insert("MOV", 0x4A);
-        m.insert("MOV_V", 0x4C);
-        m.insert("AND", 0x4D);
-        m.insert("OR", 0x51);
-        m.insert("XOR", 0x55);
-        m.insert("NOT", 0x59);
-        m.insert("LSH", 0x5B);
-        m.insert("RSH", 0x5F);
-        m.insert("VAR", 0x63);
-        m.insert("VAR_V", 0x65);
-        m.insert("RET", 0x67);
-        m.insert("DEREF", 0x6A);
-        m.insert("REF", 0x6C);
-        m.insert("INST", 0x6D);
-        m.insert("MOD", 0x6F);
+        m.insert("AND", 0x50);
+        m.insert("OR", 0x54);
+        m.insert("XOR", 0x58);
+        m.insert("NOT", 0x5C);
+        m.insert("LSH", 0x5E);
+        m.insert("RSH", 0x62);
+        m.insert("VAR", 0x66);
+        m.insert("RET", 0x6A);
+        m.insert("DEREF", 0x6D);
+        m.insert("REF", 0x6F);
+        m.insert("INST", 0x70);
+        m.insert("MOD", 0x72);
         m
     };
 }
@@ -443,10 +441,10 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
     if line.len() > 0 {
         match &line[0] {
             Token::IDENT(instr) => {
-                let variation: u8;
+                let mut variation: u8;
                 match instr.to_ascii_uppercase().as_str() {
-                    "NOP" | "POP" | "MOV_V" | "DEREF" | "REF" => variation = 0, // all non-variant instructions
-                    "PUSH" | "LDARG" | "JMP" | "MOV" | "NOT" => { // all [imm/var] instructions
+                    "NOP" | "POP" | "DEREF" | "REF" => variation = 0, // all non-variant instructions
+                    "PUSH" | "LDARG" | "JMP" | "NOT" => { // all [imm/var] instructions
                         match get_variation(&line, 1) {
                             Ok(v) => variation = v,
                             Err(err) => 
@@ -491,26 +489,34 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                             })
                         }
                     }
-                    "VAR" => { // VAR is special ([type/var] [name])
+                    "MOV" => { // MOV is special ([imm/var*] [var*])
                         match &line[1] {
-                            Token::TYPE(_) => variation = 0,
-                            Token::IDENT(_) => variation = 1,
+                            Token::NUMBER(_) => variation = 0,
+                            Token::IDENT(n) => {
+                                if n.starts_with("&") {
+                                    variation = 2;
+                                } else {
+                                    variation = 1;
+                                }
+                            }
                             _ => return Err(Error {
                                 loc: locs[line_num][1].clone(),
-                                message: format!("unexpected token `{:?}`, expected `TYPE` or `IDENT`", line[1])
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[1])
                             })
                         }
                         match &line[2] {
                             Token::IDENT(n) => {
-                                vars.push(n.clone());
+                                if n.starts_with("&") {
+                                    variation += 3;
+                                }
                             }
                             _ => return Err(Error {
-                                loc: locs[line_num][2].clone(),
+                                loc: locs[line_num][1].clone(),
                                 message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
                             })
                         }
                     }
-                    "VAR_V" => { // VAR_V is special ([type/var] [var])
+                    "VAR" => { // VAR is special ([type/var] [name/var])
                         match &line[1] {
                             Token::TYPE(_) => variation = 0,
                             Token::IDENT(_) => variation = 1,
@@ -521,6 +527,10 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                         }
                         match &line[2] {
                             Token::IDENT(n) => {
+                                if n.starts_with("&") {
+                                    variation += 2;
+                                }
+
                                 vars.push(n.clone());
                             }
                             _ => return Err(Error {
