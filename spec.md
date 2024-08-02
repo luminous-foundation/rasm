@@ -3,10 +3,10 @@
 ## INSTRUCTIONS
 
 ```
-[x]   NOP                                           Does nothing.
+[x]   NOP                                           Does nothing
 [x]   PUSH    [imm/var]                             Pushes a value onto the stack
 [x]   POP     [var]                                 Pops a value off of the stack and stores it in a variable
-[x]   LDARG   [imm/var]                             Loads an argument to be used in a function
+[x]   PEEK    [imm/var]   [var]                     Peeks a value from the stack and stores it in a variable
 [x]   CALL    [func/var]                            Calls a function
 [x]   ADD     [imm/var]   [imm/var]   [var]         Add two numbers and store in a variable
 [x]   SUB     [imm/var]   [imm/var]   [var]         Subtract two numbers and store in a variable

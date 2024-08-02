@@ -18,7 +18,7 @@ lazy_static! {
         m.insert("NOP", 0x00);
         m.insert("PUSH", 0x01);
         m.insert("POP", 0x03);
-        m.insert("LDARG", 0x04);
+        m.insert("PEEK", 0x04);
         m.insert("CALL", 0x06);
         m.insert("ADD", 0x08);
         m.insert("SUB", 0x0C);
@@ -444,7 +444,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                 let mut variation: u8;
                 match instr.to_ascii_uppercase().as_str() {
                     "NOP" | "POP" | "REF" => variation = 0, // all non-variant instructions
-                    "PUSH" | "LDARG" | "JMP" | "NOT" | "DEREF" => { // all [imm/var] instructions
+                    "PUSH" | "PEEK" | "JMP" | "NOT" | "DEREF" => { // all [imm/var] instructions
                         match get_variation(&line, 1) {
                             Ok(v) => variation = v,
                             Err(err) => 
