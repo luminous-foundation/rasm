@@ -443,8 +443,8 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
             Token::IDENT(instr) => {
                 let mut variation: u8;
                 match instr.to_ascii_uppercase().as_str() {
-                    "NOP" | "POP" | "DEREF" | "REF" => variation = 0, // all non-variant instructions
-                    "PUSH" | "LDARG" | "JMP" | "NOT" => { // all [imm/var] instructions
+                    "NOP" | "POP" | "REF" => variation = 0, // all non-variant instructions
+                    "PUSH" | "LDARG" | "JMP" | "NOT" | "DEREF" => { // all [imm/var] instructions
                         match get_variation(&line, 1) {
                             Ok(v) => variation = v,
                             Err(err) => 

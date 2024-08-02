@@ -28,7 +28,7 @@
 [x]   RSH     [imm/var]   [imm/var]   [var]         Right shift value A value B bits
 [x]   VAR     [type/var]  [name/var]                Create a variable with the given type and name
 [x]   RET     {imm/var}                             Return from a function (functions with void type do not need to include arguments)
-[x]   DEREF   [ptr]       [var]                     Dereference a pointer and store in a variable
+[x]   DEREF   [imm/ptr]   [var]                     Dereference a pointer and store in a variable
 [x]   REF     [var]       [ptr var]                 Create a reference to a variable and store in another variable
 [x]   INST    [name/var]  [var]                     Instantiate a struct with default values
 [x]   MOD     [imm/var]   [imm/var]   [var]         Perform modulus on two values and store in a variable
