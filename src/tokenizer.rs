@@ -174,21 +174,8 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     push_token!(Token::COMMA, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '*' => {
-                    if is_type(&cur_token) { // TODO: this could be smaller
-                        locs.push(loc.clone());
-                        loc.col = loc.col + cur_token.len();
-
-                        temp_type.push(*TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap());
-                        cur_token = String::from("");
-                        in_type = true;
-                    } else if in_type {
-                        in_type = false;
-                        temp_type.reverse();
-                        tokens.push(Token::TYPE(temp_type.clone()));
-                        temp_type.clear();
-                    }
-
-                    temp_type.push(Type::POINTER);
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
+                    cur_token.push(c);
                 }
                 '_' => {
                     if !in_num {
