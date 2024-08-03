@@ -11,11 +11,11 @@ void main() {
     MOV 2.3 foo.b
     MOV text foo.txt
 
-    LDARG foo.a
+    PUSH foo.a
     CALL io_print
-    LDARG foo.b
+    PUSH foo.b
     CALL io_print
-    LDARG foo.txt
+    PUSH foo.txt
     CALL io_print
 }
 
