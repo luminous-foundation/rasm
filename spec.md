@@ -32,9 +32,9 @@
 [x]   REF     [imm/var]   [ptr var]                 Create a reference to a variable and store in another variable
 [x]   INST    [name/var]  [var]                     Instantiate a struct with default values
 [x]   MOD     [imm/var]   [imm/var]   [var]         Perform modulus on two values and store in a variable
-[ ]   PMOV    [imm/var]   [ptr var]   [imm/var]     Moves the value into the pointer with the offset
-[ ]   ALLOC   [type/var]  [imm/var]   [ptr var]     Allocates a given pointer with a type and size
-[ ]   FREE    [imm/ptr]   {imm/var}                 Frees the given pointer with the given size
+[x]   PMOV    [imm/var]   [ptr var]   [imm/var]     Moves the value into the pointer with the offset
+[x]   ALLOC   [type/var]  [imm/var]   [ptr var]     Allocates a given pointer with a type and size
+[x]   FREE    [imm/ptr]   {imm/var}                 Frees the given pointer with the given size
 ```
 
 To specify a dynamic variable for the MOV instruction use the & character before the variable name.

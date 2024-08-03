@@ -514,7 +514,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                                 }
                             }
                             _ => return Err(Error {
-                                loc: locs[line_num][1].clone(),
+                                loc: locs[line_num][2].clone(),
                                 message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
                             })
                         }
@@ -566,9 +566,65 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                                 }
                             }
                             _ => return Err(Error {
-                                loc: locs[line_num][2].clone(),
+                                loc: locs[line_num][1].clone(),
                                 message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
                             })
+                        }
+                    }
+                    "PMOV" => { // PMOV is special ([imm/var] [ptr var] [imm/var])
+                        match &line[0] {
+                            Token::NUMBER(_) => variation = 0,
+                            Token::IDENT(_) => variation = 1,
+                            _ => return Err(Error {
+                                loc: locs[line_num][0].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
+                            })
+                        }
+                        match &line[2] {
+                            Token::NUMBER(_) => (),
+                            Token::IDENT(_) => variation += 2,
+                            _ => return Err(Error {
+                                loc: locs[line_num][2].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
+                            })
+                        }
+                    }
+                    "ALLOC" => { // ALLOC is special ([type/var] [imm/var] [ptr var])
+                        match &line[0] {
+                            Token::NUMBER(_) => variation = 0,
+                            Token::IDENT(_) => variation = 1,
+                            _ => return Err(Error {
+                                loc: locs[line_num][0].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
+                            })
+                        }
+                        match &line[1] {
+                            Token::NUMBER(_) => (),
+                            Token::IDENT(_) => variation += 2,
+                            _ => return Err(Error {
+                                loc: locs[line_num][1].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
+                            })
+                        }
+                    }
+                    "FREE" => { // ALLOC is special ([type/var] [imm/var] [ptr var])
+                        match &line[0] {
+                            Token::NUMBER(_) => variation = 0,
+                            Token::IDENT(_) => variation = 1,
+                            _ => return Err(Error {
+                                loc: locs[line_num][0].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
+                            })
+                        }
+                        if variation == 0 || line.len() > 2 {
+                            match &line[1] {
+                                Token::NUMBER(_) => variation += 2,
+                                Token::IDENT(_) => variation += 3,
+                                _ => return Err(Error {
+                                    loc: locs[line_num][1].clone(),
+                                    message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
+                                })
+                            }
                         }
                     }
                     _ => return Err(Error {
