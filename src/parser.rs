@@ -42,8 +42,11 @@ lazy_static! {
         m.insert("RET", 0x6A);
         m.insert("DEREF", 0x6D);
         m.insert("REF", 0x6F);
-        m.insert("INST", 0x70);
-        m.insert("MOD", 0x72);
+        m.insert("INST", 0x71);
+        m.insert("MOD", 0x73);
+        m.insert("PMOV", 0x77);
+        m.insert("ALLOC", 0x7B);
+        m.insert("FREE", 0x7F);
         m
     };
 }
@@ -443,8 +446,8 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
             Token::IDENT(instr) => {
                 let mut variation: u8;
                 match instr.to_ascii_uppercase().as_str() {
-                    "NOP" | "POP" | "REF" => variation = 0, // all non-variant instructions
-                    "PUSH" | "PEEK" | "JMP" | "NOT" | "DEREF" => { // all [imm/var] instructions
+                    "NOP" | "POP" => variation = 0, // all non-variant instructions
+                    "PUSH" | "PEEK" | "JMP" | "NOT" | "DEREF" | "REF" => { // all [imm/var] instructions
                         match get_variation(&line, 1) {
                             Ok(v) => variation = v,
                             Err(err) => 
