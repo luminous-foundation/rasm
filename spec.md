@@ -29,9 +29,12 @@
 [x]   VAR     [type/var]  [name/var]                Create a variable with the given type and name
 [x]   RET     {imm/var}                             Return from a function (functions with void type do not need to include arguments)
 [x]   DEREF   [imm/ptr]   [var]                     Dereference a pointer and store in a variable
-[x]   REF     [var]       [ptr var]                 Create a reference to a variable and store in another variable
+[x]   REF     [imm/var]   [ptr var]                 Create a reference to a variable and store in another variable
 [x]   INST    [name/var]  [var]                     Instantiate a struct with default values
 [x]   MOD     [imm/var]   [imm/var]   [var]         Perform modulus on two values and store in a variable
+[ ]   PMOV    [imm/var]   [ptr var]   [imm/var]     Moves the value into the pointer with the offset
+[ ]   ALLOC   [type/var]  [imm/var]   [ptr var]     Allocates a given pointer with a type and size
+[ ]   FREE    [imm/ptr]   {imm/var}                 Frees the given pointer with the given size
 ```
 
 To specify a dynamic variable for the MOV instruction use the & character before the variable name.
