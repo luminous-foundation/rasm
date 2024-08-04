@@ -10,3 +10,11 @@ pub struct Function {
     pub body: Vec<Vec<Token>>,
     pub body_loc: Vec<Vec<Loc>>
 }
+
+#[derive(Debug, Clone)]
+pub struct Extern {
+    pub name: String,
+    pub return_type: Vec<Type>,
+    pub arg_types: Vec<Vec<Type>>,
+    pub arg_names: Vec<String>
+}

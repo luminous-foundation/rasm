@@ -7,7 +7,7 @@ use crate::_struct::Struct;
 use crate::conversion::{convert_bytecode_string, convert_number, convert_string, convert_type, get_bytes_needed};
 use crate::data::Data;
 use crate::error::{Error, Loc, Note};
-use crate::function::Function;
+use crate::function::{Extern, Function};
 use crate::tokenizer::{Token, Type};
 use crate::_macro::Macro;
 use crate::{DEBUG, MACRO_DEPTH_LIMIT};
@@ -59,56 +59,64 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
 
     let mut vars: Vec<String> = Vec::new();
 
-    let mut macros;
-    match parse_macros(&toks, &locs) {
-        Ok(list) => macros = list,
+    let mut macros = match parse_macros(&toks, &locs) {
+        Ok(m) => m,
         Err(error) => {
             eprintln!("error while parsing macros:\n{}", error);
             process::exit(1);
         }
-    }
+    };
 
     if debug == 1 {
         println!("parsed {} macro(s), {:#?}", macros.len(), macros);
     }
 
-    let mut functions;
-    match parse_functions(&toks, &locs) {
-        Ok(list) => functions = list,
+    let mut functions = match parse_functions(&toks, &locs) {
+        Ok(f) => f,
         Err(error) => {
             eprintln!("error while parsing functions:\n{}", error);
             process::exit(1);
         }
-    }
+    };
 
     if debug >= 1 {
         println!("parsed {} function(s), {:#?}", functions.len(), functions);
     }
 
-    let data;
-    match parse_data(&toks, &locs) {
-        Ok(t) => data = t,
+    let data = match parse_data(&toks, &locs) {
+        Ok(d) => d,
         Err(error) => {
             eprintln!("error while parsing data section:\n{}", error);
             process::exit(1);
         }
-    }
+    };
 
     if debug >= 1 {
         println!("parsed {} data value(s), {:#?}", data.len(), data);
     }
 
-    let structs;
-    match parse_structs(&toks, &locs) {
-        Ok(s) => structs = s,
+    let structs = match parse_structs(&toks, &locs) {
+        Ok(s) => s,
         Err(error) => {
             eprintln!("error while parsing structs:\n{}", error);
             process::exit(1);
         }
-    }
+    };
 
     if debug >= 1 {
         println!("parsed {} struct(s), {:#?}", structs.len(), structs);
+    }
+
+    let externs = match parse_externs(&toks, &locs) {
+        Ok(e) => e,
+        Err(error) => {
+            eprintln!("error while parsing externs:\n{}", error);
+            process::exit(1);
+        }
+    };
+
+    if debug >= 1 {
+        println!("parsed {} extern(s), {:#?}", externs.len(), externs);
     }
 
     // these two loops would all be a function if the borrow checker let me
@@ -170,7 +178,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
                     }
                 }
 
-                i = i + 1;
+                i += 1;
             }
 
             _macro.content = new_content;
@@ -263,7 +271,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
             }
 
             line_num = line_num + 1;
-            i = i + 1;
+            i += 1;
         }
 
         function.body = new_body;
@@ -278,7 +286,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         for l in line {
             l.line = i + 1;
         }
-        i = i + 1;
+        i += 1;
     }
 
     // if debug >= 1 {
@@ -291,6 +299,10 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     //     // }
     // }
 
+    for _extern in externs {
+        result.append(&mut emit_extern(&_extern));
+    }
+
     for (_, _struct) in structs {
         result.append(&mut emit_struct(&_struct));
     }
@@ -301,6 +313,13 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     let mut in_top_level = true;
     while i < toks.len() {
         let mut line = &mut toks[i];
+
+        if line.len() > 0 {
+            if line[0] == Token::DOT && line[1] == Token::IDENT("extern".to_string()) {
+                i += 1;
+                continue;
+            }
+        }
 
         if functional_tokens.iter().any(|token| line.contains(token)) {
             in_top_level = false;
@@ -316,7 +335,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
             }
         }
 
-        i = i + 1;
+        i += 1;
     }
 
     for (_, mut function) in &mut (functions.clone()) {
@@ -337,6 +356,27 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
 
     return result;
+}
+
+fn emit_extern(_extern: &Extern) -> Vec<u8> {
+    let mut bytes: Vec<u8> = Vec::new();
+
+    bytes.push(0xF9);
+    
+    bytes.append(&mut convert_type(&_extern.return_type));
+    bytes.append(&mut convert_bytecode_string(&_extern.name));
+
+    for i in 0.._extern.arg_names.len() {
+        let arg_type = &_extern.arg_types[i];
+        let arg_name = &_extern.arg_names[i];
+
+        bytes.append(&mut convert_type(&arg_type));
+        bytes.append(&mut convert_bytecode_string(&arg_name));
+    }
+
+    bytes.push(0xF8);
+
+    return bytes;
 }
 
 fn emit_struct(_struct: &Struct) -> Vec<u8> {
@@ -438,7 +478,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
             _ => ()
         }
 
-        i = i + 1;
+        i += 1;
     }
 
     if line.len() > 0 {
@@ -684,6 +724,104 @@ fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
     return Ok(variation);
 }
 
+fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<Vec<Extern>, Error> {
+    let mut externs: Vec<Extern> = Vec::new();
+
+    let debug = *DEBUG.lock().unwrap();
+
+    let mut i = 0;
+    while i < toks.len() {
+        let line = &toks[i];
+
+        if line.len() > 0 {
+            if line[0] == Token::DOT && line[1] == Token::IDENT("extern".to_string()) {
+                if line.len() < 5 {
+                    return Err(Error {
+                        loc: locs[i][0].clone(),
+                        message: "extern expects a function definition".to_string()
+                    })
+                }
+
+                let is_func = matches!(
+                    (&line[2], &line[3], &line[4]),
+                    (&Token::TYPE(_), &Token::IDENT(_), &Token::LPAREN)
+                );
+
+                if !is_func {
+                    return Err(Error {
+                        loc: locs[i][0].clone(),
+                        message: "extern expects a function definition".to_string()
+                    })
+                }
+
+                let return_type;
+                match &line[2] {
+                    Token::TYPE(t) => return_type = t.clone(),
+                    _ => {
+                        return Err(Error {
+                            loc: locs[i][2].clone(),
+                            message: "unreachable".to_string()
+                        })
+                    }
+                }
+
+                let name;
+                match &line[3] {
+                    Token::IDENT(function_name) => name = function_name,
+                    _ => {
+                        return Err(Error {
+                            loc: locs[i][3].clone(),
+                            message: "unreachable".to_string()
+                        })
+                    }
+                }
+
+                if debug >= 1 {
+                    println!("found extern named {}", name);
+                }
+
+                let mut arg_types: Vec<Vec<Type>> = Vec::new();
+                let mut arg_names: Vec<String> = Vec::new();
+
+                let mut j = 5;
+
+                while line[j] != Token::RPAREN {
+                    let _type;
+                    match &line[j] {
+                        Token::TYPE(t) => _type = t,
+                        _ => 
+                        return Err(Error {
+                            loc: locs[i][j].clone(),
+                            message: format!("unexpected token `{:?}`, expected `TYPE`", line[j])
+                        })
+                    }
+
+                    let name;
+                    match &line[j + 1] {
+                        Token::IDENT(n) => name = n,
+                        _ => 
+                        return Err(Error {
+                            loc: locs[i][j].clone(),
+                            message: format!("unexpected token `{:?}`, expected `IDENT`", line[j])
+                        })
+                    }
+
+                    arg_types.push(_type.clone());
+                    arg_names.push(name.clone());
+
+                    j = j + 2;
+                }
+
+                externs.push(Extern { name: name.clone(), return_type, arg_types, arg_names });
+            }
+        }
+            
+        i += 1;
+    }
+
+    return Ok(externs);
+}
+
 fn parse_structs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Struct>, Error> {
     let mut structs: HashMap<String, Struct> = HashMap::new();
 
@@ -718,7 +856,7 @@ fn parse_structs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap
                     println!("found struct named {}", name);
                 }
 
-                i = i + 1;
+                i += 1;
 
                 let mut _struct = Struct {name: name.clone(), var_names: Vec::new(), var_types: Vec::new()};
                 while !toks[i].contains(&Token::RCURLY) {
@@ -748,14 +886,14 @@ fn parse_structs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap
 
                     _struct.var_names.push(name.clone());
                     _struct.var_types.push(_type.clone());
-                    i = i + 1;
+                    i += 1;
                 }
 
                 structs.insert(name.clone(), _struct);
             }
         }
 
-        i = i + 1;
+        i += 1;
     }
 
     return Ok(structs);
@@ -821,7 +959,7 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
             }
         }
 
-        i = i + 1;
+        i += 1;
     }
 
     return Ok(data);
@@ -835,7 +973,6 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
     let mut i = 0;
     while i < toks.len() {
         let line = &toks[i];
-        let start = i;
         
         if line.len() > 3 {
             let mut is_func = matches!(
@@ -848,7 +985,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
                     is_func = false;
                 }
 
-                i = i + 1;
+                i += 1;
             } else {
                 if line[line.len() - 2] != Token::RPAREN && line[line.len() - 1] != Token::LCURLY {
                     is_func = false;
@@ -922,19 +1059,19 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
                     body_loc: Vec::new()
                 };
                 
-                i = i + 1;
+                i += 1;
                 while !toks[i].contains(&Token::RCURLY) {
                     function.body.push(toks[i].clone());
                     function.body_loc.push(locs[i].clone());
 
-                    i = i + 1;
+                    i += 1;
                 }
 
                 functions.insert(name.clone(), function);
             }
         }
 
-        i = i + 1;
+        i += 1;
     }
 
     return Ok(functions);
@@ -1000,7 +1137,7 @@ fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<
                 }
 
                 if !line.contains(&Token::LCURLY) {
-                    i = i + 1;
+                    i += 1;
                 }
 
                 let mut _macro = Macro {
@@ -1013,19 +1150,19 @@ fn parse_macros(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<
                     content_loc: Vec::new(),
                 };
 
-                i = i + 1;
+                i += 1;
                 while !toks[i].contains(&Token::RCURLY) {
                     _macro.content.push(toks[i].clone());
                     _macro.content_loc.push(locs[i].clone());
 
-                    i = i + 1;
+                    i += 1;
                 }
 
                 macros.insert(name.clone(), _macro);
             }
         }
 
-        i = i + 1;
+        i += 1;
     }
 
     return Ok(macros);
