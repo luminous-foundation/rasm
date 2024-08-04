@@ -2,8 +2,6 @@ use crate::{error::Loc, tokenizer::{Token, Type}};
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub loc: Loc,
-
     pub name: String,
     pub return_type: Vec<Type>,
     pub arg_types: Vec<Vec<Type>>,
