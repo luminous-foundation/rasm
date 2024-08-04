@@ -37,7 +37,7 @@
 [x]   FREE    [imm/ptr]   {imm/var}                 Frees the given pointer with the given size
 ```
 
-To specify a dynamic variable for the MOV instruction use the & character before the variable name.
+To specify a dynamic variable for the MOV instruction use the @ character before the variable name.
 
 ## TYPES
 

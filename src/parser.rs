@@ -374,6 +374,8 @@ fn emit_extern(_extern: &Extern) -> Vec<u8> {
         bytes.append(&mut convert_bytecode_string(&arg_name));
     }
 
+    bytes.append(&mut convert_bytecode_string(&_extern.dll));
+
     bytes.push(0xF8);
 
     return bytes;
@@ -536,7 +538,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                         match &line[1] {
                             Token::NUMBER(_) => variation = 0,
                             Token::IDENT(n) => {
-                                if n.starts_with("&") {
+                                if n.starts_with("@") {
                                     variation = 2;
                                 } else {
                                     variation = 1;
@@ -549,7 +551,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                         }
                         match &line[2] {
                             Token::IDENT(n) => {
-                                if n.starts_with("&") {
+                                if n.starts_with("@") {
                                     variation += 3;
                                 }
                             }
@@ -570,7 +572,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                         }
                         match &line[2] {
                             Token::IDENT(n) => {
-                                if n.starts_with("&") {
+                                if n.starts_with("@") {
                                     variation += 2;
                                 }
 
@@ -809,10 +811,30 @@ fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<Vec<Ext
                     arg_types.push(_type.clone());
                     arg_names.push(name.clone());
 
-                    j = j + 2;
+                    j += 2;
                 }
 
-                externs.push(Extern { name: name.clone(), return_type, arg_types, arg_names });
+                j += 1;
+
+                match &line[j] {
+                    Token::AT => j += 1,
+                    _ => 
+                    return Err(Error {
+                        loc: locs[i][j].clone(),
+                        message: format!("unexpected token `{:?}`, expected `AT`", line[j])
+                    })
+                }
+
+                let dll = match &line[j] {
+                    Token::STRING(s) => s,
+                    _ => 
+                    return Err(Error {
+                        loc: locs[i][j].clone(),
+                        message: format!("unexpected token `{:?}`, expected `STRING`", line[j])
+                    })
+                };
+
+                externs.push(Extern { name: name.clone(), return_type, arg_types, arg_names, dll: dll.clone() });
             }
         }
             
@@ -948,6 +970,7 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
                 Token::DOT => todo!(),
                 Token::COMMA => todo!(),
                 Token::IDENT(_) => todo!(),
+                Token::AT => todo!(),
             }
 
             data.insert(name.clone(), Data {name: name.clone(), _type: _type.clone(), data: bytes});
@@ -1048,7 +1071,7 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
                     arg_types.push(_type.clone());
                     arg_names.push(name.clone());
 
-                    j = j + 2;
+                    j += 2;
                 }
 
                 let mut function = Function {
