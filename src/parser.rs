@@ -567,17 +567,35 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                             }
                             _ => return Err(Error {
                                 loc: locs[line_num][1].clone(),
-                                message: format!("unexpected token `{:?}`, expected `IDENT`", line[2])
+                                message: format!("unexpected token `{:?}`, expected `IDENT`", line[1])
                             })
                         }
                     }
                     "PMOV" => { // PMOV is special ([imm/var] [ptr var] [imm/var])
-                        match &line[0] {
+                        match &line[1] {
                             Token::NUMBER(_) => variation = 0,
                             Token::IDENT(_) => variation = 1,
                             _ => return Err(Error {
-                                loc: locs[line_num][0].clone(),
-                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
+                                loc: locs[line_num][1].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[1])
+                            })
+                        }
+                        match &line[3] {
+                            Token::NUMBER(_) => (),
+                            Token::IDENT(_) => variation += 2,
+                            _ => return Err(Error {
+                                loc: locs[line_num][3].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[3])
+                            })
+                        }
+                    }
+                    "ALLOC" => { // ALLOC is special ([type/var] [imm/var] [ptr var])
+                        match &line[1] {
+                            Token::TYPE(_) => variation = 0,
+                            Token::IDENT(_) => variation = 1,
+                            _ => return Err(Error {
+                                loc: locs[line_num][1].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[1])
                             })
                         }
                         match &line[2] {
@@ -589,43 +607,27 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                             })
                         }
                     }
-                    "ALLOC" => { // ALLOC is special ([type/var] [imm/var] [ptr var])
-                        match &line[0] {
+                    "FREE" => { // FREE is special ([imm/var] {imm/var})
+                        match &line[1] {
                             Token::NUMBER(_) => variation = 0,
                             Token::IDENT(_) => variation = 1,
-                            _ => return Err(Error {
-                                loc: locs[line_num][0].clone(),
-                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
-                            })
-                        }
-                        match &line[1] {
-                            Token::NUMBER(_) => (),
-                            Token::IDENT(_) => variation += 2,
                             _ => return Err(Error {
                                 loc: locs[line_num][1].clone(),
-                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
-                            })
-                        }
-                    }
-                    "FREE" => { // ALLOC is special ([type/var] [imm/var] [ptr var])
-                        match &line[0] {
-                            Token::NUMBER(_) => variation = 0,
-                            Token::IDENT(_) => variation = 1,
-                            _ => return Err(Error {
-                                loc: locs[line_num][0].clone(),
-                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[1])
                             })
                         }
                         if variation == 0 || line.len() > 2 {
-                            match &line[1] {
+                            match &line[2] {
                                 Token::NUMBER(_) => variation += 2,
-                                Token::IDENT(_) => variation += 3,
+                                Token::IDENT(_) => variation += 4,
                                 _ => return Err(Error {
-                                    loc: locs[line_num][1].clone(),
+                                    loc: locs[line_num][2].clone(),
                                     message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[2])
                                 })
                             }
                         }
+
+                        variation -= 1;
                     }
                     _ => return Err(Error {
                         loc: locs[line_num][0].clone(),
@@ -913,8 +915,6 @@ fn parse_functions(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashM
                 }
 
                 let mut function = Function {
-                    loc: locs[start][0].clone(), 
-
                     name: name.to_string(), 
                     arg_types, arg_names, return_type, 
                     
