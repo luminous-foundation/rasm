@@ -4,7 +4,7 @@ use std::process;
 use lazy_static::lazy_static;
 
 use crate::_struct::Struct;
-use crate::conversion::{convert_bytecode_string, convert_number, convert_string, convert_type, get_bytes_needed};
+use crate::conversion::{convert_bytecode_string, convert_number, convert_string, convert_type};
 use crate::data::Data;
 use crate::error::{Error, Loc, Note};
 use crate::function::{Extern, Function};
@@ -403,7 +403,6 @@ fn emit_data(data: &Data) -> Vec<u8> {
 
     bytes.append(&mut convert_bytecode_string(&data.name));
     bytes.append(&mut convert_type(&data._type));
-    bytes.push(get_bytes_needed((data.data.len() as u64).into()));
     bytes.append(&mut convert_number((data.data.len() as u64).into()));
     
     for b in &data.data {

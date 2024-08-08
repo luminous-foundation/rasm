@@ -66,8 +66,8 @@ This section is placed at the end of the file.
 The format is as follow
 ```
 .data
-(name) (type) (data)
-(name) (type) (data)
+(name) (type) (length type) (length) (data)
+(name) (type) (length type) (length) (data)
 ...
 ```
 An example data section may look like this

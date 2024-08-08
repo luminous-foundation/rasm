@@ -82,9 +82,9 @@ pub fn convert_type(_type: &Vec<Type>) -> Vec<u8> {
     return res;
 }
 
-pub fn get_bytes_needed(n: Number) -> u8 {
-    return ((Into::<f64>::into(n) + 1.).log2() / 8.0).ceil() as u8;
-}
+// pub fn get_bytes_needed(n: Number) -> u8 {
+//     return ((Into::<f64>::into(n) + 1.).log2() / 8.0).ceil() as u8;
+// }
 
 // TODO: squeeze into smallest type
 pub fn get_type(n: &Number) -> u8 {
