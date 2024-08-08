@@ -299,8 +299,8 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     //     // }
     // }
 
-    for _extern in externs {
-        result.append(&mut emit_extern(&_extern));
+    for (_, _extern) in &externs {
+        result.append(&mut emit_extern(_extern));
     }
 
     for (_, _struct) in structs {
@@ -326,7 +326,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         }
 
         if in_top_level {
-            match emit_line(&mut line, &functions, &locs, i, &mut vars) {
+            match emit_line(&mut line, &functions, &externs, &locs, i, &mut vars) {
                 Ok(mut bytes) => result.append(&mut bytes),
                 Err(error) => {
                     eprintln!("error while parsing emitting line:\n{}", error);
@@ -339,7 +339,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
 
     for (_, mut function) in &mut (functions.clone()) {
-        match emit_function(&mut function, &functions, &vars) {
+        match emit_function(&mut function, &functions, &externs, &vars) {
             Ok(mut bytes) => result.append(&mut bytes),
             Err(error) => {
                 eprintln!("error while parsing emitting function:\n{}", error);
@@ -374,9 +374,9 @@ fn emit_extern(_extern: &Extern) -> Vec<u8> {
         bytes.append(&mut convert_bytecode_string(&arg_name));
     }
 
-    bytes.append(&mut convert_bytecode_string(&_extern.dll));
-
     bytes.push(0xF8);
+
+    bytes.append(&mut convert_bytecode_string(&_extern.dll));
 
     return bytes;
 }
@@ -413,7 +413,7 @@ fn emit_data(data: &Data) -> Vec<u8> {
     return bytes;
 }
 
-fn emit_function(function: &mut Function, functions: &HashMap<String, Function>, vars: &Vec<String>) -> Result<Vec<u8>, Error> {
+fn emit_function(function: &mut Function, functions: &HashMap<String, Function>, externs: &HashMap<String, Extern>, vars: &Vec<String>) -> Result<Vec<u8>, Error> {
     let mut bytes: Vec<u8> = Vec::new();
 
     let mut local_vars = vars.clone();
@@ -435,7 +435,7 @@ fn emit_function(function: &mut Function, functions: &HashMap<String, Function>,
 
     let mut line_num = 0;
     for mut line in &mut function.body {
-        match emit_line(&mut line, functions, &function.body_loc, line_num, &mut local_vars) {
+        match emit_line(&mut line, functions, externs, &function.body_loc, line_num, &mut local_vars) {
             Ok(mut b) => bytes.append(&mut b),
             Err(error) => return Err(error)
         }
@@ -447,7 +447,7 @@ fn emit_function(function: &mut Function, functions: &HashMap<String, Function>,
     return Ok(bytes);
 }
 
-fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs: &Vec<Vec<Loc>>, line_num: usize, vars: &mut Vec<String>) -> Result<Vec<u8>, Error> {
+fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, externs: &HashMap<String, Extern>, locs: &Vec<Vec<Loc>>, line_num: usize, vars: &mut Vec<String>) -> Result<Vec<u8>, Error> {
     let mut bytes: Vec<u8> = Vec::new();
 
     let mut i = 1;
@@ -522,7 +522,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, locs:
                     "CALL" => { // CALL is special ([func/var])
                         match &line[1] {
                             Token::IDENT(ident) => {
-                                if functions.contains_key(ident) {
+                                if functions.contains_key(ident) || externs.contains_key(ident) {
                                     variation = 0;
                                 } else {
                                     variation = 1;
@@ -726,8 +726,8 @@ fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
     return Ok(variation);
 }
 
-fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<Vec<Extern>, Error> {
-    let mut externs: Vec<Extern> = Vec::new();
+fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Extern>, Error> {
+    let mut externs: HashMap<String, Extern> = HashMap::new();
 
     let debug = *DEBUG.lock().unwrap();
 
@@ -834,7 +834,7 @@ fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<Vec<Ext
                     })
                 };
 
-                externs.push(Extern { name: name.clone(), return_type, arg_types, arg_names, dll: dll.clone() });
+                externs.insert(name.clone(), Extern { name: name.clone(), return_type, arg_types, arg_names, dll: dll.clone() });
             }
         }
             
