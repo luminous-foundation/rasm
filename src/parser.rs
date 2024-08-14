@@ -8,6 +8,7 @@ use crate::conversion::{convert_bytecode_string, convert_number, convert_string,
 use crate::data::Data;
 use crate::error::{Error, Loc, Note};
 use crate::function::{Extern, Function};
+use crate::number::Number;
 use crate::tokenizer::{Token, Type};
 use crate::_macro::Macro;
 use crate::{DEBUG, MACRO_DEPTH_LIMIT};
@@ -118,6 +119,14 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     if debug >= 1 {
         println!("parsed {} extern(s), {:#?}", externs.len(), externs);
     }
+
+   match parse_labels(&mut toks, &locs) {
+        Ok(_) => (),
+        Err(error) => {
+            eprintln!("error while parsing labels:\n{}", error);
+            process::exit(1);
+        }
+    };
 
     // these two loops would all be a function if the borrow checker let me
     // i might make it a function some day but right now i cannot be bothered to figure it out
@@ -289,16 +298,6 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         i += 1;
     }
 
-    // if debug >= 1 {
-    //     println!("after macro resolution...");
-    //     println!("parsed {} macro(s), {:?}", macros.len(), macros);
-    //     println!("parsed {} functions(s), {:?}", functions.len(), functions);
-    //     // println!("locs\n");
-    //     // for i in 0..locs.len() {
-    //     //     println!("{:?}", locs[i]);
-    //     // }
-    // }
-
     for (_, _extern) in &externs {
         result.append(&mut emit_extern(_extern));
     }
@@ -329,7 +328,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
             match emit_line(&mut line, &functions, &externs, &locs, i, &mut vars) {
                 Ok(mut bytes) => result.append(&mut bytes),
                 Err(error) => {
-                    eprintln!("error while parsing emitting line:\n{}", error);
+                    eprintln!("error while emitting line:\n{}", error);
                     process::exit(1);
                 }
             }
@@ -679,6 +678,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, exter
                 let byte = INSTR_MAP.get(instr.as_str()).expect("unreachable, the previous step should've caught this").clone();
                 bytes.push(byte + variation);
             }
+            Token::COLON => (),
             _ => return Err(Error {
                 loc: locs[line_num][1].clone(),
                 message: format!("unexpected token `{:?}`, expected `IDENT`", line[0])
@@ -718,11 +718,96 @@ fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
         match &line[i + 1] {
             Token::IDENT(_) => variation = variation | (1 << i),
             Token::NUMBER(_) => (),
-            _ => return Err(format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[i]))
+            _ => return Err(format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[i + 1]))
         }
     }
 
     return Ok(variation);
+}
+
+fn parse_labels(toks: &mut Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<(), Error> {
+    let mut labels: HashMap<String, usize> = HashMap::new();
+
+    let debug = *DEBUG.lock().unwrap();
+
+    let mut i = 0;
+    let mut instr = 0;
+    while i < toks.len() {
+        let line = &toks[i];
+
+        if line.len() > 1 {
+            if matches!(&line[0], Token::IDENT(_)) {
+                instr += 1;
+            }
+
+            if matches!((&line[0], &line[1]), (Token::COLON, Token::IDENT(_))) {
+                let name = match &line[1] {
+                    Token::IDENT(n) => n,
+                    _ => panic!("unreachable")
+                };
+
+                if debug >= 1 {
+                    println!("found label named {name} at {instr}");
+                }
+
+                labels.insert(name.to_string(), instr);
+            }
+        }
+
+        i += 1;
+    }
+
+    i = 0;
+    while i < toks.len() {
+        let line = &toks[i];
+
+        if line.len() > 1 {
+            if matches!((&line[0], &line[1]), (Token::COLON, Token::IDENT(_))) {
+                toks.remove(i);
+            }
+        }
+
+        i += 1;
+    }
+
+    i = 0;
+    while i < toks.len() {
+        let line = &mut toks[i];
+
+        if line.len() > 0 {
+            let index = line.iter().position(|r|  r == &Token::COLON);
+            if index.is_some() {
+                let index = index.unwrap();
+
+                let label_name = match &line[index + 1] {
+                    Token::IDENT(n) => n,
+                    _ => 
+                    return Err(Error {
+                        loc: locs[i][index].clone(),
+                        message: format!("unexpected token `{:?}`, expected `IDENT`", line[index])
+                    })
+                };
+
+                if !labels.contains_key(label_name) {
+                    return Err(Error {
+                        loc: locs[i][index].clone(),
+                        message: format!("attempted to use undefined label `{}`", label_name)
+                    })
+                }
+
+                let label_value = labels.get(label_name).unwrap();
+
+                line.remove(index);
+                line.remove(index);
+                
+                line.insert(index, Token::NUMBER(Number::UNSIGNED(*label_value as u64)));
+            }
+        }
+
+        i += 1;
+    }
+
+    return Ok(());
 }
 
 fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<String, Extern>, Error> {
@@ -930,7 +1015,7 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
     while i < toks.len() {
         let line = &toks[i];
 
-        if in_section {
+        if in_section && line.len() > 0 {
             let name;
             match &line[0] {
                 Token::IDENT(n) => name = n,
@@ -970,6 +1055,7 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
                 Token::COMMA => todo!(),
                 Token::IDENT(_) => todo!(),
                 Token::AT => todo!(),
+                Token::COLON => todo!(),
             }
 
             data.insert(name.clone(), Data {name: name.clone(), _type: _type.clone(), data: bytes});

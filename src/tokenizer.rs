@@ -67,6 +67,7 @@ pub enum Token {
     COMMA,
     IDENT(String),
     AT,
+    COLON,
 }
 
 macro_rules! push_type {
@@ -158,6 +159,9 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                 }
                 '@' => {
                     push_token!(Token::AT, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
+                }
+                ':' => {
+                    push_token!(Token::COLON, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '"' => {
                     push_type!(tokens, cur_token, locs, loc, temp_type, in_type);

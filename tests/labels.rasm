@@ -1,0 +1,5 @@
+VAR u64 count
+
+:loop
+ADD 1 count count
+JL count 100_000 :loop
