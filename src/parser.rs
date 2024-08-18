@@ -556,7 +556,7 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, exter
                     "CALL" => { // CALL is special ([func/var])
                         match &line[1] {
                             Token::IDENT(ident) => {
-                                if functions.contains_key(ident) || externs.contains_key(ident) {
+                                if functions.contains_key(ident) || externs.contains_key(ident) || ident.starts_with("@") {
                                     variation = 0;
                                 } else {
                                     variation = 1;
