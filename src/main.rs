@@ -109,7 +109,7 @@ fn usage() {
     println!("  help                            prints this subcommand list");
     println!("  assemble [file]                 assembles the given rasm file to rbb file");
     println!("  test     [run/update] [folder]  updates expected test results or runs tests on a given folder");
-}
+}   
 
 fn exec_test(self_path: String, file: String) -> Result<Output, String> {
     let prog = Command::new(self_path).args(["assemble", file.as_str()]).output();

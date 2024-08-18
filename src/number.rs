@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use std::num::ParseFloatError;
 
@@ -7,6 +8,18 @@ pub enum Number {
     UNSIGNED(u64),
     FLOAT(f64),
 }
+
+impl Hash for Number {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Number::SIGNED(n) => (*n).hash(state),
+            Number::UNSIGNED(n) => (*n).hash(state),
+            Number::FLOAT(n) => (*n).to_bits().hash(state),
+        }
+    }
+}
+
+impl Eq for Number {}
 
 impl Number {
     pub fn add(&self, other: &Number) -> Number {

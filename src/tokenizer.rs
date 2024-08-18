@@ -52,7 +52,7 @@ fn is_type(input: &str) -> bool {
     TYPE_MAP.contains_key(&input.to_uppercase()[..])
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Token {
     NUMBER(Number),
     TYPE(Vec<Type>),
@@ -66,7 +66,6 @@ pub enum Token {
     DOT,
     COMMA,
     IDENT(String),
-    AT,
     COLON,
 }
 
@@ -156,9 +155,6 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                 }
                 ']' => {
                     push_token!(Token::RSQUARE, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
-                }
-                '@' => {
-                    push_token!(Token::AT, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 ':' => {
                     push_token!(Token::COLON, tokens, cur_token, locs, loc, temp_type, in_type, in_num);

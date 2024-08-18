@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process;
 
 use lazy_static::lazy_static;
@@ -48,6 +48,15 @@ lazy_static! {
         m.insert("PMOV", 0x77);
         m.insert("ALLOC", 0x7B);
         m.insert("FREE", 0x7F);
+        m
+    };
+}
+
+lazy_static! {
+    static ref TOP_LEVEL: HashSet<Token> = {
+        let mut m = HashSet::new();
+        m.insert(Token::IDENT("extern".to_string()));
+        m.insert(Token::IDENT("include".to_string()));
         m
     };
 }
@@ -120,13 +129,25 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         println!("parsed {} extern(s), {:#?}", externs.len(), externs);
     }
 
-   match parse_labels(&mut toks, &locs) {
+    match parse_labels(&mut toks, &locs) {
         Ok(_) => (),
         Err(error) => {
             eprintln!("error while parsing labels:\n{}", error);
             process::exit(1);
         }
     };
+
+    let imports = match parse_imports(&toks, &locs) {
+        Ok(i) => i,
+        Err(error) => {
+            eprintln!("error while parsing imports:\n{}", error);
+            process::exit(1);
+        }
+    };
+
+    if debug >= 1 {
+        println!("parsed {} import(s), {:#?}", imports.len(), imports);
+    }
 
     // these two loops would all be a function if the borrow checker let me
     // i might make it a function some day but right now i cannot be bothered to figure it out
@@ -302,6 +323,10 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         result.append(&mut emit_extern(_extern));
     }
 
+    for import in imports {
+        result.append(&mut emit_import(&import));
+    }
+
     for (_, _struct) in structs {
         result.append(&mut emit_struct(&_struct));
     }
@@ -314,7 +339,7 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         let mut line = &mut toks[i];
 
         if line.len() > 0 {
-            if line[0] == Token::DOT && line[1] == Token::IDENT("extern".to_string()) {
+            if line[0] == Token::DOT && TOP_LEVEL.contains(&line[1]) {
                 i += 1;
                 continue;
             }
@@ -355,6 +380,17 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
     }
 
     return result;
+}
+
+// TODO: auto-reassemble imports
+fn emit_import(import: &String) -> Vec<u8> {
+    let mut bytes: Vec<u8> = Vec::new();
+
+    bytes.push(0xFA);
+
+    bytes.append(&mut convert_bytecode_string(import));
+
+    return bytes;
 }
 
 fn emit_extern(_extern: &Extern) -> Vec<u8> {
@@ -702,7 +738,14 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, exter
 
 fn emit_token(token: &Token, bytes: &mut Vec<u8>) -> Result<(), String> {
     match token {
-        Token::IDENT(str) => bytes.append(&mut convert_bytecode_string(str)),
+        Token::IDENT(str) => {
+            if str.starts_with("@") {
+                let new_str = str.as_str()[1..].to_string();
+                bytes.append(&mut convert_bytecode_string(&new_str));
+            } else {
+                bytes.append(&mut convert_bytecode_string(str));
+            }
+        }
         Token::NUMBER(n) => bytes.append(&mut convert_number(n.clone())),
         Token::TYPE(t) => bytes.append(&mut convert_type(t)),
         _ => return Err(format!("unexpected token `{:?}`, expected `IDENT`, `NUMBER` or `TYPE`", token))
@@ -723,6 +766,40 @@ fn get_variation(line: &Vec<Token>, amnt: usize) -> Result<u8, String> {
     }
 
     return Ok(variation);
+}
+
+fn parse_imports(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<Vec<String>, Error> {
+    let mut imports: Vec<String> = Vec::new();
+
+    let debug = *DEBUG.lock().unwrap();
+
+    let mut i = 0;
+    while i < toks.len() {
+        let line = &toks[i];
+
+        if line.len() > 1 {
+            if line[0] == Token::DOT && line[1] == Token::IDENT("include".to_string()) {
+                let import = match &line[2] {
+                    Token::STRING(n) => n,
+                    _ => 
+                    return Err(Error {
+                        loc: locs[i][2].clone(),
+                        message: format!("unexpected token `{:?}`, expected `STRING`", line[2])
+                    })
+                };
+
+                if debug >= 1 {
+                    println!("found import of {import}");
+                }
+
+                imports.push(import.clone());
+            }
+        }
+
+        i += 1;
+    }
+
+    return Ok(imports);
 }
 
 fn parse_labels(toks: &mut Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<(), Error> {
@@ -901,7 +978,11 @@ fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap
                 j += 1;
 
                 match &line[j] {
-                    Token::AT => j += 1,
+                    Token::IDENT(n) => {
+                        if n == "@" {
+                            j += 1;
+                        }
+                    }
                     _ => 
                     return Err(Error {
                         loc: locs[i][j].clone(),
@@ -1054,7 +1135,6 @@ fn parse_data(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap<St
                 Token::DOT => todo!(),
                 Token::COMMA => todo!(),
                 Token::IDENT(_) => todo!(),
-                Token::AT => todo!(),
                 Token::COLON => todo!(),
             }
 
