@@ -129,14 +129,6 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         println!("parsed {} extern(s), {:#?}", externs.len(), externs);
     }
 
-    match parse_labels(&mut toks, &locs) {
-        Ok(_) => (),
-        Err(error) => {
-            eprintln!("error while parsing labels:\n{}", error);
-            process::exit(1);
-        }
-    };
-
     let imports = match parse_imports(&toks, &locs) {
         Ok(i) => i,
         Err(error) => {
@@ -168,43 +160,45 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
 
             let mut i = 0;
             while i < _macro.content.len() {
-                match &_macro.content[i][0] {
-                    Token::IDENT(n) => {
-                        if rust_why.contains_key(n) {
-                            resolved_macro = true;
-                            
-                            if !last_macros.contains(&name) {
-                                last_macros.push(name.clone());
-                            }
-
-                            let referenced_macro = rust_why.get(n).expect("unreachable");
-                            let mut j = 0;
-                            for line in &referenced_macro.content {
-                                new_content.push(Vec::new());
-
-                                for token in line {
-                                    match token {
-                                        Token::IDENT(n) => {
-                                            if referenced_macro.args.contains(n) {
-                                                let index = referenced_macro.args.iter().position(|r| r == n).unwrap();
-                                                new_content[i + j].push(_macro.content[i][index + 1].clone());
-                                            } else {
-                                                new_content[i + j].push(token.clone());
-                                            }
-                                        }
-                                        _ => new_content[i + j].push(token.clone())
-                                    }
+                if _macro.content[i].len() > 0 {
+                    match &_macro.content[i][0] {
+                        Token::IDENT(n) => {
+                            if rust_why.contains_key(n) {
+                                resolved_macro = true;
+                                
+                                if !last_macros.contains(&name) {
+                                    last_macros.push(name.clone());
                                 }
-                                j = j + 1;
+
+                                let referenced_macro = rust_why.get(n).expect("unreachable");
+                                let mut j = 0;
+                                for line in &referenced_macro.content {
+                                    new_content.push(Vec::new());
+
+                                    for token in line {
+                                        match token {
+                                            Token::IDENT(n) => {
+                                                if referenced_macro.args.contains(n) {
+                                                    let index = referenced_macro.args.iter().position(|r| r == n).unwrap();
+                                                    new_content[i + j].push(_macro.content[i][index + 1].clone());
+                                                } else {
+                                                    new_content[i + j].push(token.clone());
+                                                }
+                                            }
+                                            _ => new_content[i + j].push(token.clone())
+                                        }
+                                    }
+                                    j = j + 1;
+                                }
+                            } else {
+                                new_content.push(Vec::new());
+                                new_content[i].append(&mut _macro.content[i]);
                             }
-                        } else {
+                        }
+                        _ => {
                             new_content.push(Vec::new());
                             new_content[i].append(&mut _macro.content[i]);
                         }
-                    }
-                    _ => {
-                        new_content.push(Vec::new());
-                        new_content[i].append(&mut _macro.content[i]);
                     }
                 }
 
@@ -331,6 +325,14 @@ pub fn parse(mut toks: Vec<Vec<Token>>, mut locs: Vec<Vec<Loc>>) -> Vec<u8> {
         result.append(&mut emit_struct(&_struct));
     }
 
+    match parse_labels(&mut toks, &locs) {
+        Ok(_) => (),
+        Err(error) => {
+            eprintln!("error while parsing labels:\n{}", error);
+            process::exit(1);
+        }
+    };
+
     let mut i = 0;
     let functional_tokens = &[Token::DOT, Token::LCURLY, Token::RCURLY, Token::LPAREN, Token::RPAREN];
 
@@ -388,7 +390,7 @@ fn emit_import(import: &String) -> Vec<u8> {
 
     bytes.push(0xFA);
 
-    bytes.append(&mut convert_bytecode_string(import));
+    bytes.append(&mut convert_bytecode_string(&import.replace(".rasm", ".rbb")));
 
     return bytes;
 }
@@ -401,12 +403,10 @@ fn emit_extern(_extern: &Extern) -> Vec<u8> {
     bytes.append(&mut convert_type(&_extern.return_type));
     bytes.append(&mut convert_bytecode_string(&_extern.name));
 
-    for i in 0.._extern.arg_names.len() {
+    for i in 0.._extern.arg_types.len() {
         let arg_type = &_extern.arg_types[i];
-        let arg_name = &_extern.arg_names[i];
 
         bytes.append(&mut convert_type(&arg_type));
-        bytes.append(&mut convert_bytecode_string(&arg_name));
     }
 
     bytes.push(0xF8);
@@ -466,6 +466,14 @@ fn emit_function(function: &mut Function, functions: &HashMap<String, Function>,
     }
 
     bytes.push(0xFE);
+
+    match parse_labels(&mut function.body, &function.body_loc) {
+        Ok(_) => (),
+        Err(error) => {
+            eprintln!("error while parsing labels:\n{}", error);
+            process::exit(1);
+        }
+    };
 
     let mut line_num = 0;
     for mut line in &mut function.body {
@@ -802,6 +810,7 @@ fn parse_imports(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<Vec<Str
     return Ok(imports);
 }
 
+// TODO: this fails to take imports into account
 fn parse_labels(toks: &mut Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<(), Error> {
     let mut labels: HashMap<String, usize> = HashMap::new();
 
@@ -870,6 +879,10 @@ fn parse_labels(toks: &mut Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<(), 
                         loc: locs[i][index].clone(),
                         message: format!("attempted to use undefined label `{}`", label_name)
                     })
+                } 
+                
+                if debug >= 1 {
+                    println!("replacing label {label_name}");
                 }
 
                 let label_value = labels.get(label_name).unwrap();
@@ -878,6 +891,10 @@ fn parse_labels(toks: &mut Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<(), 
                 line.remove(index);
                 
                 line.insert(index, Token::NUMBER(Number::UNSIGNED(*label_value as u64)));
+
+                if debug >= 1 {
+                    println!("{:?}", line);
+                }
             }
         }
 
@@ -944,7 +961,6 @@ fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap
                 }
 
                 let mut arg_types: Vec<Vec<Type>> = Vec::new();
-                let mut arg_names: Vec<String> = Vec::new();
 
                 let mut j = 5;
 
@@ -959,20 +975,9 @@ fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap
                         })
                     }
 
-                    let name;
-                    match &line[j + 1] {
-                        Token::IDENT(n) => name = n,
-                        _ => 
-                        return Err(Error {
-                            loc: locs[i][j].clone(),
-                            message: format!("unexpected token `{:?}`, expected `IDENT`", line[j])
-                        })
-                    }
-
                     arg_types.push(_type.clone());
-                    arg_names.push(name.clone());
 
-                    j += 2;
+                    j += 1;
                 }
 
                 j += 1;
@@ -999,7 +1004,7 @@ fn parse_externs(toks: &Vec<Vec<Token>>, locs: &Vec<Vec<Loc>>) -> Result<HashMap
                     })
                 };
 
-                externs.insert(name.clone(), Extern { name: name.clone(), return_type, arg_types, arg_names, dll: dll.clone() });
+                externs.insert(name.clone(), Extern { name: name.clone(), return_type, arg_types, dll: dll.clone() });
             }
         }
             

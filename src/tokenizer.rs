@@ -139,24 +139,31 @@ pub fn tokenize(line: String, loc: &mut Loc) -> (Vec<Token>, Vec<Loc>) {
                     cur_token.push(c);
                 }
                 '(' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push_token!(Token::LPAREN, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 ')' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push_token!(Token::RPAREN, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '{' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push_token!(Token::LCURLY, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '}' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push_token!(Token::RCURLY, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '[' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push_token!(Token::LSQUARE, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 ']' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push_token!(Token::RSQUARE, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 ':' => {
+                    push_type!(tokens, cur_token, locs, loc, temp_type, in_type);
                     push_token!(Token::COLON, tokens, cur_token, locs, loc, temp_type, in_type, in_num);
                 }
                 '"' => {
