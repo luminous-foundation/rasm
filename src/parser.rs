@@ -48,6 +48,7 @@ lazy_static! {
         m.insert("PMOV", 0x77);
         m.insert("ALLOC", 0x7B);
         m.insert("FREE", 0x7F);
+        m.insert("CALLC", 0x84);
         m
     };
 }
@@ -712,6 +713,32 @@ fn emit_line(line: &mut Vec<Token>, functions: &HashMap<String, Function>, exter
                         }
 
                         variation -= 1;
+                    }
+                    "CALLC" => { // CALLC is special ([imm/var] [type/var] [imm/var])
+                        match &line[1] {
+                            Token::NUMBER(_) => variation = 0,
+                            Token::IDENT(_) => variation = 1,
+                            _ => return Err(Error {
+                                loc: locs[line_num][1].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[1])
+                            })
+                        }
+                        match &line[2] {
+                            Token::TYPE(_) => (),
+                            Token::IDENT(_) => variation += 2,
+                            _ => return Err(Error {
+                                loc: locs[line_num][2].clone(),
+                                message: format!("unexpected token `{:?}`, expected `TYPE` or `IDENT`", line[2])
+                            })
+                        }
+                        match &line[3] {
+                            Token::NUMBER(_) => (),
+                            Token::IDENT(_) => variation += 4,
+                            _ => return Err(Error {
+                                loc: locs[line_num][3].clone(),
+                                message: format!("unexpected token `{:?}`, expected `NUMBER` or `IDENT`", line[3])
+                            })
+                        }
                     }
                     _ => return Err(Error {
                         loc: locs[line_num][0].clone(),
