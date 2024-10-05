@@ -41,6 +41,9 @@
 To specify a dynamic variable for the MOV instruction use the @ character before the variable name.
 To specify an imported function for the CALL instruction use the @ character before the function name.
 
+When declaring a variable, do not use $ before the variable name.
+When using a variable, use $ before the variable name.
+
 ## TYPES
 
 ```
