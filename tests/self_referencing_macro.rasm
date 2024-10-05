@@ -1,3 +1,0 @@
-.macro SELF_REF {
-    SELF_REF
-}

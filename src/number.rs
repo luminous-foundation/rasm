@@ -6,7 +6,7 @@ use std::num::ParseFloatError;
 pub enum Number {
     SIGNED(i64),
     UNSIGNED(u64),
-    FLOAT(f64),
+    DECIMAL(f64),
 }
 
 impl Hash for Number {
@@ -14,7 +14,7 @@ impl Hash for Number {
         match self {
             Number::SIGNED(n) => (*n).hash(state),
             Number::UNSIGNED(n) => (*n).hash(state),
-            Number::FLOAT(n) => (*n).to_bits().hash(state),
+            Number::DECIMAL(n) => (*n).to_bits().hash(state),
         }
     }
 }
@@ -26,13 +26,13 @@ impl Number {
         match (self, other) {
             (Number::SIGNED(a), Number::SIGNED(b)) => Number::SIGNED(a + b),
             (Number::UNSIGNED(a), Number::UNSIGNED(b)) => Number::UNSIGNED(a + b),
-            (Number::FLOAT(a), Number::FLOAT(b)) => Number::FLOAT(a + b),
+            (Number::DECIMAL(a), Number::DECIMAL(b)) => Number::DECIMAL(a + b),
             (Number::SIGNED(a), Number::UNSIGNED(b)) => Number::SIGNED(*a + *b as i64),
             (Number::UNSIGNED(a), Number::SIGNED(b)) => Number::SIGNED(*a as i64 + *b),
-            (Number::SIGNED(a), Number::FLOAT(b)) => Number::FLOAT(*a as f64 + b),
-            (Number::UNSIGNED(a), Number::FLOAT(b)) => Number::FLOAT(*a as f64 + b),
-            (Number::FLOAT(a), Number::SIGNED(b)) => Number::FLOAT(a + *b as f64),
-            (Number::FLOAT(a), Number::UNSIGNED(b)) => Number::FLOAT(a + *b as f64),
+            (Number::SIGNED(a), Number::DECIMAL(b)) => Number::DECIMAL(*a as f64 + b),
+            (Number::UNSIGNED(a), Number::DECIMAL(b)) => Number::DECIMAL(*a as f64 + b),
+            (Number::DECIMAL(a), Number::SIGNED(b)) => Number::DECIMAL(a + *b as f64),
+            (Number::DECIMAL(a), Number::UNSIGNED(b)) => Number::DECIMAL(a + *b as f64),
         }
     }
 
@@ -40,13 +40,13 @@ impl Number {
         match (self, other) {
             (Number::SIGNED(a), Number::SIGNED(b)) => Number::SIGNED(a - b),
             (Number::UNSIGNED(a), Number::UNSIGNED(b)) => Number::UNSIGNED(a - b),
-            (Number::FLOAT(a), Number::FLOAT(b)) => Number::FLOAT(a - b),
+            (Number::DECIMAL(a), Number::DECIMAL(b)) => Number::DECIMAL(a - b),
             (Number::SIGNED(a), Number::UNSIGNED(b)) => Number::SIGNED(*a - *b as i64),
             (Number::UNSIGNED(a), Number::SIGNED(b)) => Number::SIGNED(*a as i64 - *b),
-            (Number::SIGNED(a), Number::FLOAT(b)) => Number::FLOAT(*a as f64 - b),
-            (Number::UNSIGNED(a), Number::FLOAT(b)) => Number::FLOAT(*a as f64 - b),
-            (Number::FLOAT(a), Number::SIGNED(b)) => Number::FLOAT(a - *b as f64),
-            (Number::FLOAT(a), Number::UNSIGNED(b)) => Number::FLOAT(a - *b as f64),
+            (Number::SIGNED(a), Number::DECIMAL(b)) => Number::DECIMAL(*a as f64 - b),
+            (Number::UNSIGNED(a), Number::DECIMAL(b)) => Number::DECIMAL(*a as f64 - b),
+            (Number::DECIMAL(a), Number::SIGNED(b)) => Number::DECIMAL(a - *b as f64),
+            (Number::DECIMAL(a), Number::UNSIGNED(b)) => Number::DECIMAL(a - *b as f64),
         }
     }
 
@@ -54,13 +54,13 @@ impl Number {
         match (self, other) {
             (Number::SIGNED(a), Number::SIGNED(b)) => Number::SIGNED(a * b),
             (Number::UNSIGNED(a), Number::UNSIGNED(b)) => Number::UNSIGNED(a * b),
-            (Number::FLOAT(a), Number::FLOAT(b)) => Number::FLOAT(a * b),
+            (Number::DECIMAL(a), Number::DECIMAL(b)) => Number::DECIMAL(a * b),
             (Number::SIGNED(a), Number::UNSIGNED(b)) => Number::SIGNED(*a * *b as i64),
             (Number::UNSIGNED(a), Number::SIGNED(b)) => Number::SIGNED(*a as i64 * *b),
-            (Number::SIGNED(a), Number::FLOAT(b)) => Number::FLOAT(*a as f64 * b),
-            (Number::UNSIGNED(a), Number::FLOAT(b)) => Number::FLOAT(*a as f64 * b),
-            (Number::FLOAT(a), Number::SIGNED(b)) => Number::FLOAT(a * *b as f64),
-            (Number::FLOAT(a), Number::UNSIGNED(b)) => Number::FLOAT(a * *b as f64),
+            (Number::SIGNED(a), Number::DECIMAL(b)) => Number::DECIMAL(*a as f64 * b),
+            (Number::UNSIGNED(a), Number::DECIMAL(b)) => Number::DECIMAL(*a as f64 * b),
+            (Number::DECIMAL(a), Number::SIGNED(b)) => Number::DECIMAL(a * *b as f64),
+            (Number::DECIMAL(a), Number::UNSIGNED(b)) => Number::DECIMAL(a * *b as f64),
         }
     }
 
@@ -68,13 +68,13 @@ impl Number {
         match (self, other) {
             (Number::SIGNED(a), Number::SIGNED(b)) => Number::SIGNED(a / b),
             (Number::UNSIGNED(a), Number::UNSIGNED(b)) => Number::UNSIGNED(a / b),
-            (Number::FLOAT(a), Number::FLOAT(b)) => Number::FLOAT(a / b),
+            (Number::DECIMAL(a), Number::DECIMAL(b)) => Number::DECIMAL(a / b),
             (Number::SIGNED(a), Number::UNSIGNED(b)) => Number::SIGNED(*a / *b as i64),
             (Number::UNSIGNED(a), Number::SIGNED(b)) => Number::SIGNED(*a as i64 / *b),
-            (Number::SIGNED(a), Number::FLOAT(b)) => Number::FLOAT(*a as f64 / b),
-            (Number::UNSIGNED(a), Number::FLOAT(b)) => Number::FLOAT(*a as f64 / b),
-            (Number::FLOAT(a), Number::SIGNED(b)) => Number::FLOAT(a / *b as f64),
-            (Number::FLOAT(a), Number::UNSIGNED(b)) => Number::FLOAT(a / *b as f64),
+            (Number::SIGNED(a), Number::DECIMAL(b)) => Number::DECIMAL(*a as f64 / b),
+            (Number::UNSIGNED(a), Number::DECIMAL(b)) => Number::DECIMAL(*a as f64 / b),
+            (Number::DECIMAL(a), Number::SIGNED(b)) => Number::DECIMAL(a / *b as f64),
+            (Number::DECIMAL(a), Number::UNSIGNED(b)) => Number::DECIMAL(a / *b as f64),
         }
     }
 }
@@ -93,7 +93,7 @@ impl From<u64> for Number {
 
 impl From<f64> for Number {
     fn from(f: f64) -> Self {
-        Number::FLOAT(f)
+        Number::DECIMAL(f)
     }
 }
 
@@ -102,7 +102,7 @@ impl From<Number> for i64 {
         match n {
             Number::SIGNED(i) => i,
             Number::UNSIGNED(u) => u as i64,
-            Number::FLOAT(f) => f as i64,
+            Number::DECIMAL(f) => f as i64,
         }
     }
 }
@@ -112,7 +112,7 @@ impl From<Number> for u64 {
         match n {
             Number::SIGNED(i) => i as u64,
             Number::UNSIGNED(u) => u,
-            Number::FLOAT(f) => f as u64,
+            Number::DECIMAL(f) => f as u64,
         }
     }
 }
@@ -122,7 +122,7 @@ impl From<Number> for f64 {
         match n {
             Number::SIGNED(i) => i as f64,
             Number::UNSIGNED(u) => u as f64,
-            Number::FLOAT(f) => f,
+            Number::DECIMAL(f) => f,
         }
     }
 }
@@ -136,7 +136,7 @@ impl FromStr for Number {
         } else if let Ok(i) = s.parse::<i64>() {
             Ok(Number::SIGNED(i))
         } else if let Ok(f) = s.parse::<f64>() {
-            Ok(Number::FLOAT(f))
+            Ok(Number::DECIMAL(f))
         } else {
             Err(s.parse::<f64>().unwrap_err())
         }

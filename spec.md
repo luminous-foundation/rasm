@@ -35,6 +35,7 @@
 [x]   PMOV    [imm/var]   [ptr var]   [imm/var]     Moves the value into the pointer with the offset
 [x]   ALLOC   [type/var]  [imm/var]   [ptr var]     Allocates a given pointer with a type and size
 [x]   FREE    [imm/ptr]   {imm/var}                 Frees the given pointer with the given size
+[x]   CALLC   [imm/var]   [type/var]  [imm/var]     Calls the function at the given address with the given arguments and return type.
 ```
 
 To specify a dynamic variable for the MOV instruction use the @ character before the variable name.
@@ -167,6 +168,16 @@ An example struct would look like this
 The values within structs are accessed through the normal instructions used for variables, with the format of
 ```
 (struct instance name).(field)
+```
+
+## CONDITIONAL PARSING
+Conditional parsing allows you to toggle any part of your code based off of constant variables. These varaibles are provided by either the runtime or the user.
+```c#
+.if PLATFORM == PLATFORM_WINDOWS
+    {code}
+.elseif PLATFORM == PLATFORM_LINUX
+    {code}
+.end
 ```
 
 ## ERRORS
