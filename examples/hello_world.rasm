@@ -1,6 +1,6 @@
 .import "io.rasm"
 
-void main() {
+void main(u8** args) {
     PUSH "Hello, World!"
     PUSH 13
     CALL io_println

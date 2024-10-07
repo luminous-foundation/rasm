@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, net::ToSocketAddrs};
 
-use crate::{expr::Expr, instruction::Instruction, number::Number, tokenizer::Token};
+use crate::{expr::{self, Expr}, instruction::Instruction, number::Number, tokenizer::Token};
 use lazy_static::lazy_static;
-use rainbow_wrapper::{ident, immediate, name, rainbow_wrapper::types::Value};
+use rainbow_wrapper::{ident, immediate, name, rainbow_wrapper::{functions::Arg, types::Value, wrapper::Wrapper}};
 
 lazy_static! {
     static ref INSTR_MAP: HashMap<&'static str, Instruction> = {
@@ -44,10 +44,13 @@ lazy_static! {
     };
 }
 
-pub fn parse(tokens: Vec<Vec<Token>>) -> Vec<Expr> {
+pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
     let mut res: Vec<Expr> = Vec::new();
 
-    for line in tokens {
+    let mut i = 0;
+    while i < tokens.len() {
+        let line = &tokens[i];
+
         println!("{line:?}");
 
         if line.len() > 0 {
@@ -76,6 +79,11 @@ pub fn parse(tokens: Vec<Vec<Token>>) -> Vec<Expr> {
 
                                     Value::TYPE(new_type)
                                 }
+                                Token::STRING(s) => {
+                                    wrapper.push_string(&s);
+
+                                    Value::IDENT(s)
+                                }
                                 _ => panic!("unexpected token {arg:?}")
                             });
                         }
@@ -85,19 +93,93 @@ pub fn parse(tokens: Vec<Vec<Token>>) -> Vec<Expr> {
                         todo!("unhandled ident {:?}", line[0])
                     }
                 }
+                Token::TYPE(_) => {
+                    if line.len() < 2 {
+                        panic!("unexpected token {:?}", line[0]);
+                    }
+
+                    match &line[1] {
+                        Token::IDENT(_) => {
+                            let mut end = i;
+                            while &tokens[end][0] != &Token::RCURLY {
+                                end += 1;
+                            }
+
+                            res.push(parse_function(tokens[i..end].to_vec(), wrapper));
+
+                            i = end;
+                        }
+                        _ => panic!("unexpected token {:?}", line[0])
+                    }
+                }
+                Token::DOT => {}
                 _ => {
                     todo!("unhandled token {:?}", line[0])
                 }
             }
         }
 
-        println!("{:?}", res[res.len()-1]);
+        if res.len() > 0 {
+            println!("{:?}", res[res.len()-1]);
+        }
+
+        i += 1;
     }
+
+    wrapper.push(emit(&res));
 
     return res;
 }
 
-pub fn emit(exprs: Vec<Expr>) -> Vec<u8> {
+pub fn parse_function(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Expr {
+    let ret_type = match &tokens[0][0] {
+        Token::TYPE(t) => {
+            let mut new_type = Vec::new();
+            for typ in t {
+                new_type.push(typ.to_rbtype());
+            }
+
+            new_type
+        }
+        _ => panic!("unexpected token {:?}", tokens[0][0])
+    };
+
+    let name = match &tokens[0][1] {
+        Token::IDENT(n) => n,
+        _ => panic!("unexpected token {:?}", tokens[0][0])
+    }.clone();
+
+    let mut args: Vec<Arg> = Vec::new();
+    let mut i = 3;
+    while tokens[0][i] != Token::RPAREN {
+        let typ = match &tokens[0][i] {
+            Token::TYPE(t) => {
+                let mut new_type = Vec::new();
+                for typ in t {
+                    new_type.push(typ.to_rbtype());
+                }
+
+                new_type
+            }
+            _ => panic!("unexpected token {:?}", tokens[0][i])
+        };
+
+        let name = match &tokens[0][i + 1] {
+            Token::IDENT(s) => s,
+            _ => panic!("unexpected token {:?}", tokens[0][i + 1])
+        }.clone();
+
+        args.push(Arg { name, typ });
+
+        i += 2;
+    }
+
+    let body = parse(tokens[1..].to_vec(), wrapper);
+
+    return Expr::FUNCDEF(name, args, ret_type, body);
+}
+
+pub fn emit(exprs: &Vec<Expr>) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
 
     for expr in exprs {

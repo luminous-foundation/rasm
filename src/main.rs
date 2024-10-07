@@ -1,6 +1,7 @@
 use std::{fs, io::Write, path::Path};
 
 use parser::{emit, parse};
+use rainbow_wrapper::rainbow_wrapper::wrapper::Wrapper;
 use tokenizer::{tokenize, Token};
 
 mod tokenizer;
@@ -10,7 +11,7 @@ mod expr;
 mod instruction;
 
 fn main() {
-    let file = "./examples/addition";
+    let file = "./examples/hello_world";
 
     let contents = fs::read_to_string(file.to_string() + ".rasm").expect("failed to read file");
 
@@ -22,7 +23,13 @@ fn main() {
         tokens.push(line);
     }
 
-    let bytes = emit(parse(tokens));
+    let mut wrapper = Wrapper::new();
+
+    parse(tokens, &mut wrapper);
+
+    let bytes = wrapper.emit();
+
+    println!("{:?}", bytes);
 
     let rbb_file = file.to_string() + ".rbb";
     if Path::new(&rbb_file).exists() {

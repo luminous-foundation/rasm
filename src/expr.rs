@@ -1,11 +1,14 @@
+use ::rainbow_wrapper::rainbow_wrapper::functions::{generate_function, Arg};
 use ::rainbow_wrapper::rainbow_wrapper::types::Value;
+use ::rainbow_wrapper::rainbow_wrapper::types::Type;
 use ::rainbow_wrapper::*;
 
 use crate::instruction::Instruction;
 
 #[derive(Debug)]
 pub enum Expr {
-    INSTR(Instruction, Vec<Value>)
+    INSTR(Instruction, Vec<Value>),
+    FUNCDEF(String, Vec<Arg>, Vec<Type>, Vec<Expr>),
 }
 
 impl Expr {
@@ -73,6 +76,15 @@ impl Expr {
                     
                     Instruction::CALLC => callc!(args[0].clone(), args[1].clone(), args[2].clone()),
                 }
+            }
+            Expr::FUNCDEF(name, args, return_type, body) => {
+                let mut body_bytes: Vec<u8> = Vec::new();
+
+                for expr in body {
+                    body_bytes.append(&mut expr.to_bytes());
+                }
+
+                generate_function(name, args, return_type, &body_bytes)
             }
         }
     }
