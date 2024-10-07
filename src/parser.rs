@@ -109,10 +109,40 @@ pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
 
                             i = end;
                         }
-                        _ => panic!("unexpected token {:?}", line[0])
+                        _ => panic!("unexpected token {:?}", line[1])
                     }
                 }
-                Token::DOT => {}
+                Token::DOT => {
+                    if line.len() < 2 {
+                        panic!("unexpected token {:?}", line[0]);
+                    }
+
+                    match &line[1] {
+                        Token::IDENT(s) => {
+                            match s.to_lowercase().as_str() {
+                                "import" => {
+                                    match &line[2] {
+                                        Token::IDENT(s) => {
+                                            wrapper.push_import(&(s.clone() + ".rbb"));
+                                        }
+                                        Token::STRING(s) => {
+                                            if s.ends_with(".rasm") {
+                                                wrapper.push_import(&(s.split(".").next().unwrap().to_string() + ".rbb"));
+                                            } else if s.ends_with(".rbb") {
+                                                wrapper.push_import(s);
+                                            } else {
+                                                wrapper.push_import(&(s.clone() + ".rbb"));
+                                            }
+                                        }
+                                        _ => panic!("unexpected token {:?}", line[2])
+                                    }
+                                }
+                                _ => panic!("unexpected token {:?}", line[1])
+                            }
+                        }
+                        _ => panic!("unexpected token {:?}", line[1])
+                    }
+                }
                 _ => {
                     todo!("unhandled token {:?}", line[0])
                 }
@@ -125,8 +155,6 @@ pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
 
         i += 1;
     }
-
-    wrapper.push(emit(&res));
 
     return res;
 }

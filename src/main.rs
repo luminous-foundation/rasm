@@ -25,7 +25,8 @@ fn main() {
 
     let mut wrapper = Wrapper::new();
 
-    parse(tokens, &mut wrapper);
+    let program = emit(&parse(tokens, &mut wrapper));
+    wrapper.push(program);
 
     let bytes = wrapper.emit();
 
