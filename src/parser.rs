@@ -1,8 +1,8 @@
-use std::{collections::HashMap, net::ToSocketAddrs};
+use std::{collections::HashMap, fs, path::Path};
 
-use crate::{expr::{self, Expr}, instruction::Instruction, number::Number, tokenizer::Token};
+use crate::{assemble, expr::Expr, instruction::Instruction, number::Number, tokenizer::{self, Token}};
 use lazy_static::lazy_static;
-use rainbow_wrapper::{ident, immediate, name, rainbow_wrapper::{functions::Arg, types::Value, wrapper::Wrapper}};
+use rainbow_wrapper::{ident, immediate, name, rainbow_wrapper::{r#extern::Extern, functions::Arg, types::{Type, Value}, wrapper::Wrapper}};
 
 lazy_static! {
     static ref INSTR_MAP: HashMap<&'static str, Instruction> = {
@@ -44,14 +44,77 @@ lazy_static! {
     };
 }
 
-pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
-    let mut res: Vec<Expr> = Vec::new();
-
+pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mut Vec<String>) -> Vec<Expr> {
     let mut i = 0;
+
+    // pre-processing
+    let mut labels: HashMap<String, usize> = HashMap::new();
+
+    let mut instr = 0;
+
+    // labels
     while i < tokens.len() {
         let line = &tokens[i];
 
-        println!("{line:?}");
+        if line.len() > 0 {
+            match &line[0] {
+                Token::IDENT(s) => {
+                    if INSTR_MAP.contains_key(s.as_str()) {
+                        instr += 1;
+                    }
+                }
+                Token::COLON => {
+                    match &line[1] {
+                        Token::IDENT(s) => {
+                            if labels.contains_key(s) {
+                                panic!("redefined label {s}");
+                            } else {
+                                labels.insert(s.to_string(), instr);
+                            }
+                        }
+                        _ => panic!("unexpected token {:?}", line[1])
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        i += 1;
+    }
+
+    i = 0;
+    while i < tokens.len() {
+        let mut j = 0;
+        while j < tokens[i].len() {
+            if tokens[i][j] == Token::COLON {
+                match tokens[i][j + 1].clone() {
+                    Token::IDENT(s) => {
+                        if tokens[i].len() > 2 {
+                            tokens[i].remove(j);
+                            tokens[i].remove(j);
+                            
+                            tokens[i].insert(j, Token::NUMBER(Number::UNSIGNED(*labels.get(&s).expect(format!("unknown label {s}").as_str()) as u64)));
+                        } else {
+                            tokens.remove(i);
+                        }
+                    }
+                    _ => panic!("unexpected token {:?}", tokens[i][j + 1])
+                }
+            }
+
+            j += 1;
+        }
+
+        i += 1;
+    }
+
+    // processing
+    let mut res: Vec<Expr> = Vec::new();
+    i = 0;
+    while i < tokens.len() {
+        let line = &tokens[i];
+
+        // println!("{line:?}");
 
         if line.len() > 0 {
             match &line[0] {
@@ -72,12 +135,7 @@ pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
                                     }
                                 }
                                 Token::TYPE(t) => {
-                                    let mut new_type = Vec::new();
-                                    for typ in t {
-                                        new_type.push(typ.to_rbtype());
-                                    }
-
-                                    Value::TYPE(new_type)
+                                    Value::TYPE(to_rb_type(t))
                                 }
                                 Token::STRING(s) => {
                                     wrapper.push_string(&s);
@@ -101,11 +159,17 @@ pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
                     match &line[1] {
                         Token::IDENT(_) => {
                             let mut end = i;
-                            while &tokens[end][0] != &Token::RCURLY {
+                            loop {
+                                if tokens[end].len() > 0 {
+                                    if &tokens[end][0] == &Token::RCURLY {
+                                        break;
+                                    }
+                                }
+
                                 end += 1;
                             }
 
-                            res.push(parse_function(tokens[i..end].to_vec(), wrapper));
+                            res.push(parse_function(tokens[i..end].to_vec(), wrapper, link_paths));
 
                             i = end;
                         }
@@ -127,6 +191,31 @@ pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
                                         }
                                         Token::STRING(s) => {
                                             if s.ends_with(".rasm") {
+                                                let mut import_path = String::new();
+                                                for path in link_paths.clone() {
+                                                    let paths = match fs::read_dir(path) {
+                                                        Ok(p) => p,
+                                                        Err(e) => panic!("{}", e.to_string()),
+                                                    };
+
+                                                    for path in paths {
+                                                        let dir_entry = path.unwrap();
+                                                        let path = &dir_entry.path();
+                                                        let path_str = path.as_os_str().to_str().unwrap();
+                                                        if path_str.ends_with(s) {
+                                                            if import_path == "" {
+                                                                import_path = path_str.to_owned();
+                                                            } else {
+                                                                panic!("ambiguous import {s}");
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                if Path::exists(Path::new(&import_path)) {
+                                                    assemble(import_path, link_paths);
+                                                }
+
                                                 wrapper.push_import(&(s.split(".").next().unwrap().to_string() + ".rbb"));
                                             } else if s.ends_with(".rbb") {
                                                 wrapper.push_import(s);
@@ -136,6 +225,36 @@ pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
                                         }
                                         _ => panic!("unexpected token {:?}", line[2])
                                     }
+                                }
+                                "extern" => {
+                                    let ret_type = match &line[2] {
+                                        Token::TYPE(t) => {
+                                            to_rb_type(t.clone())
+                                        }
+                                        _ => panic!("unexpected token {:?}", line[2])
+                                    };
+
+                                    let name = match &line[3] {
+                                        Token::IDENT(s) => s,
+                                        _ => panic!("unexpected token {:?}", line[3])
+                                    }.clone();
+
+                                    let mut arg_types: Vec<Vec<Type>> = Vec::new();
+                                    let mut index = 5;
+                                    while line[index] != Token::RPAREN {
+                                        match &line[index] {
+                                            Token::TYPE(t) => arg_types.push(to_rb_type(t.clone())),
+                                            _ => panic!("unexpected token {:?}", line[index])
+                                        }
+                                        index += 1;
+                                    }
+
+                                    let file = match &line[index+2] {
+                                        Token::STRING(s) => s,
+                                        _ => panic!("unexpected token {:?}", line[index + 2])
+                                    }.clone();
+
+                                    wrapper.push_extern(Extern { ret_type, name, arg_types, file });
                                 }
                                 _ => panic!("unexpected token {:?}", line[1])
                             }
@@ -149,9 +268,9 @@ pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
             }
         }
 
-        if res.len() > 0 {
-            println!("{:?}", res[res.len()-1]);
-        }
+        // if res.len() > 0 {
+        //     println!("{:?}", res[res.len()-1]);
+        // }
 
         i += 1;
     }
@@ -159,15 +278,19 @@ pub fn parse(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Vec<Expr> {
     return res;
 }
 
-pub fn parse_function(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Expr {
+pub fn to_rb_type(t: Vec<tokenizer::Type>) -> Vec<Type> {
+    let mut new_type = Vec::new();
+    for typ in t {
+        new_type.push(typ.to_rbtype());
+    }
+
+    return new_type;
+}
+
+pub fn parse_function(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mut Vec<String>) -> Expr {
     let ret_type = match &tokens[0][0] {
         Token::TYPE(t) => {
-            let mut new_type = Vec::new();
-            for typ in t {
-                new_type.push(typ.to_rbtype());
-            }
-
-            new_type
+            to_rb_type(t.clone())
         }
         _ => panic!("unexpected token {:?}", tokens[0][0])
     };
@@ -182,12 +305,7 @@ pub fn parse_function(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Expr {
     while tokens[0][i] != Token::RPAREN {
         let typ = match &tokens[0][i] {
             Token::TYPE(t) => {
-                let mut new_type = Vec::new();
-                for typ in t {
-                    new_type.push(typ.to_rbtype());
-                }
-
-                new_type
+                to_rb_type(t.clone())
             }
             _ => panic!("unexpected token {:?}", tokens[0][i])
         };
@@ -202,7 +320,7 @@ pub fn parse_function(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper) -> Expr {
         i += 2;
     }
 
-    let body = parse(tokens[1..].to_vec(), wrapper);
+    let body = parse(tokens[1..].to_vec(), wrapper, link_paths);
 
     return Expr::FUNCDEF(name, args, ret_type, body);
 }

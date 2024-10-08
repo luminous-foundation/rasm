@@ -1,4 +1,5 @@
-.import io
+; If you end imports with `.rasm` RASM will automatically assemble them.
+.import "io.rasm"
 
 void main() {
     PUSH "Hello, World!"

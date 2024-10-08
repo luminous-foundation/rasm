@@ -1,4 +1,4 @@
-use std::{fs, io::Write, path::Path};
+use std::{env::{self}, fs, io::Write, path::Path};
 
 use parser::{emit, parse};
 use rainbow_wrapper::rainbow_wrapper::wrapper::Wrapper;
@@ -11,7 +11,39 @@ mod expr;
 mod instruction;
 
 fn main() {
-    let file = "./examples/hello_world";
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        panic!("expected file");
+    }
+    if !args[1].ends_with(".rasm") {
+        panic!("expected RASM file");
+    }
+
+    let mut i = 0;
+    let mut link_paths: Vec<String> = Vec::new();
+    while i < args.len() {
+        match args[i].as_str() {
+            "-l" | "--link" => {
+                i += 1;
+                link_paths.push(args[i].clone());
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    assemble(args[1].clone(), &mut link_paths);
+}
+
+pub fn assemble(rasm_file: String, link_paths: &mut Vec<String>) {
+    println!("assembling {rasm_file}");
+
+    let file = rasm_file.split(".rasm").collect::<Vec<&str>>()[0];
+    let folder = rasm_file.split(|c| c == '\\' || c == '/').collect::<Vec<&str>>();
+    let folder = folder[0..folder.len()-1].to_vec().join("/") + "/";
+
+    link_paths.push(folder);
 
     let contents = fs::read_to_string(file.to_string() + ".rasm").expect("failed to read file");
 
@@ -25,12 +57,10 @@ fn main() {
 
     let mut wrapper = Wrapper::new();
 
-    let program = emit(&parse(tokens, &mut wrapper));
+    let program = emit(&parse(tokens, &mut wrapper, link_paths));
     wrapper.push(program);
 
     let bytes = wrapper.emit();
-
-    println!("{:?}", bytes);
 
     let rbb_file = file.to_string() + ".rbb";
     if Path::new(&rbb_file).exists() {

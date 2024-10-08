@@ -207,7 +207,7 @@ pub fn tokenize(line: String) -> Vec<Token> {
                         cur_token.push(c);
                     }
                 }
-                ' ' | '\r' | '\n' | '\t' => {
+                ' ' | '\r' | '\n' | '\t' | ',' => {
                     push_type!(tokens, cur_token, temp_type, in_type);
                     push!(tokens, cur_token, in_num, in_var);
                 }
