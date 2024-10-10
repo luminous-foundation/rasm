@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::{HashMap, HashSet}, fs, path::Path};
 
 use crate::{assemble, expr::Expr, instruction::Instruction, number::Number, tokenizer::{self, Token}};
 use lazy_static::lazy_static;
@@ -44,7 +44,7 @@ lazy_static! {
     };
 }
 
-pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mut Vec<String>) -> Vec<Expr> {
+pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mut HashSet<String>) -> Vec<Expr> {
     let mut i = 0;
 
     // pre-processing
@@ -275,6 +275,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                     let end = get_block_body(&tokens, i);
 
                                     let body = parse(tokens[i+1..end].to_vec(), wrapper, link_paths);
+                                    i = end;
 
                                     match s.to_lowercase().as_str() {
                                         "if" => res.push(Expr::IF_BLOCK(left, cond, right, body)),
@@ -352,7 +353,7 @@ pub fn to_rb_type(t: Vec<tokenizer::Type>) -> Vec<Type> {
     return new_type;
 }
 
-pub fn parse_function(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mut Vec<String>) -> Expr {
+pub fn parse_function(tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mut HashSet<String>) -> Expr {
     let ret_type = match &tokens[0][0] {
         Token::TYPE(t) => {
             to_rb_type(t.clone())

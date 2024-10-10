@@ -1,4 +1,4 @@
-use std::{env::{self}, fs, io::Write, path::Path};
+use std::{collections::HashSet, env::{self}, fs, io::Write, path::Path};
 
 use parser::{emit, parse};
 use rainbow_wrapper::wrapper::Wrapper;
@@ -21,12 +21,12 @@ fn main() {
     }
 
     let mut i = 0;
-    let mut link_paths: Vec<String> = Vec::new();
+    let mut link_paths: HashSet<String> = HashSet::new();
     while i < args.len() {
         match args[i].as_str() {
             "-l" | "--link" => {
                 i += 1;
-                link_paths.push(args[i].clone());
+                link_paths.insert(args[i].clone());
             }
             _ => {}
         }
@@ -36,14 +36,14 @@ fn main() {
     assemble(args[1].clone(), &mut link_paths);
 }
 
-pub fn assemble(rasm_file: String, link_paths: &mut Vec<String>) {
+pub fn assemble(rasm_file: String, link_paths: &mut HashSet<String>) {
     println!("assembling {rasm_file}");
 
     let file = rasm_file.split(".rasm").collect::<Vec<&str>>()[0];
     let folder = rasm_file.split(|c| c == '\\' || c == '/').collect::<Vec<&str>>();
     let folder = folder[0..folder.len()-1].to_vec().join("/") + "/";
 
-    link_paths.push(folder);
+    link_paths.insert(folder);
 
     let contents = fs::read_to_string(file.to_string() + ".rasm").expect("failed to read file");
 
@@ -68,5 +68,5 @@ pub fn assemble(rasm_file: String, link_paths: &mut Vec<String>) {
     }
 
     let mut file = fs::OpenOptions::new().create_new(true).write(true).open(rbb_file).expect("failed to open file to save");
-    let _ = file.write_all(&bytes); 
+    let _ = file.write_all(&bytes);
 }
