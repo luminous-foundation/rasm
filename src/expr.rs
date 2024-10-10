@@ -1,14 +1,17 @@
-use ::rainbow_wrapper::rainbow_wrapper::functions::{generate_function, Arg};
-use ::rainbow_wrapper::rainbow_wrapper::types::Value;
-use ::rainbow_wrapper::rainbow_wrapper::types::Type;
+use ::rainbow_wrapper::functions::{generate_function, Arg};
 use ::rainbow_wrapper::*;
 
 use crate::instruction::Instruction;
 
 #[derive(Debug)]
+#[allow(non_camel_case_types)]
 pub enum Expr {
     INSTR(Instruction, Vec<Value>),
     FUNCDEF(String, Vec<Arg>, Vec<Type>, Vec<Expr>),
+    IF_BLOCK(String, String, String, Vec<Expr>),
+    ELSEIF_BLOCK(String, String, String, Vec<Expr>),
+    ELSE_BLOCK(Vec<Expr>),
+    END_BLOCK,
 }
 
 impl Expr {
@@ -85,6 +88,36 @@ impl Expr {
                 }
 
                 generate_function(name, args, return_type, &body_bytes)
+            }
+            Expr::IF_BLOCK(left, cond, right, body) => {
+                let mut body_bytes: Vec<u8> = Vec::new();
+
+                for expr in body {
+                    body_bytes.append(&mut expr.to_bytes());
+                }
+
+                if_block!(left, cond, right, body_bytes)
+            }
+            Expr::ELSEIF_BLOCK(left, cond, right, body) => {
+                let mut body_bytes: Vec<u8> = Vec::new();
+
+                for expr in body {
+                    body_bytes.append(&mut expr.to_bytes());
+                }
+
+                elseif_block!(left, cond, right, body_bytes)
+            }
+            Expr::ELSE_BLOCK(body) => {
+                let mut body_bytes: Vec<u8> = Vec::new();
+
+                for expr in body {
+                    body_bytes.append(&mut expr.to_bytes());
+                }
+
+                else_block!(body_bytes)
+            }
+            Expr::END_BLOCK => {
+                end_block!()
             }
         }
     }

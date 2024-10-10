@@ -1,7 +1,7 @@
 use std::{env::{self}, fs, io::Write, path::Path};
 
 use parser::{emit, parse};
-use rainbow_wrapper::rainbow_wrapper::wrapper::Wrapper;
+use rainbow_wrapper::wrapper::Wrapper;
 use tokenizer::{tokenize, Token};
 
 mod tokenizer;

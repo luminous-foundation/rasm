@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs, path::Path};
 
 use crate::{assemble, expr::Expr, instruction::Instruction, number::Number, tokenizer::{self, Token}};
 use lazy_static::lazy_static;
-use rainbow_wrapper::{ident, immediate, name, rainbow_wrapper::{r#extern::Extern, functions::Arg, types::{Type, Value}, wrapper::Wrapper}};
+use rainbow_wrapper::{ident, immediate, name, r#extern::Extern, functions::Arg, types::{Type, Value}, wrapper::Wrapper};
 
 lazy_static! {
     static ref INSTR_MAP: HashMap<&'static str, Instruction> = {
@@ -184,7 +184,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                     match &line[1] {
                         Token::IDENT(s) => {
                             match s.to_lowercase().as_str() {
-                                "import" => {
+                                "include" => {
                                     match &line[2] {
                                         Token::IDENT(s) => {
                                             wrapper.push_import(&(s.clone() + ".rbb"));
@@ -256,6 +256,42 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
 
                                     wrapper.push_extern(Extern { ret_type, name, arg_types, file });
                                 }
+                                "if" | "elseif" => {
+                                    let left = match &line[2] {
+                                        Token::IDENT(s) => s,
+                                        _ => panic!("unexpected token {:?}", line[2])
+                                    }.clone();
+                                    
+                                    let cond = match &line[3] {
+                                        Token::IDENT(s) => s,
+                                        _ => panic!("unexpected token {:?}", line[3])
+                                    }.clone();
+
+                                    let right = match &line[4] {
+                                        Token::IDENT(s) => s,
+                                        _ => panic!("unexpected token {:?}", line[4])
+                                    }.clone();
+
+                                    let end = get_block_body(&tokens, i);
+
+                                    let body = parse(tokens[i+1..end].to_vec(), wrapper, link_paths);
+
+                                    match s.to_lowercase().as_str() {
+                                        "if" => res.push(Expr::IF_BLOCK(left, cond, right, body)),
+                                        "elseif" => res.push(Expr::ELSEIF_BLOCK(left, cond, right, body)),
+                                        _ => unreachable!()
+                                    }
+                                }
+                                "else" => {
+                                    let end = get_block_body(&tokens, i);
+
+                                    let body = parse(tokens[i+1..end].to_vec(), wrapper, link_paths);
+
+                                    res.push(Expr::ELSE_BLOCK(body));
+                                }
+                                "end" => {
+                                    res.push(Expr::END_BLOCK);
+                                }
                                 _ => panic!("unexpected token {:?}", line[1])
                             }
                         }
@@ -276,6 +312,35 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
     }
 
     return res;
+}
+
+fn get_block_body(tokens: &Vec<Vec<Token>>, i: usize) -> usize {
+    let mut end = i + 1;
+    while end < tokens.len() {
+        // :)
+        if tokens[end].len() >= 2 {
+            match &tokens[end][0] {
+                Token::DOT => {
+                    match &tokens[end][1] {
+                        Token::IDENT(s) => {
+                            match s.as_str() {
+                                "if" | "elseif" | "else" | "end" => {
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }       
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        end += 1;
+    }
+
+    return end;
 }
 
 pub fn to_rb_type(t: Vec<tokenizer::Type>) -> Vec<Type> {

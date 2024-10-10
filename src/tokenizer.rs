@@ -1,6 +1,5 @@
 use std::{collections::HashMap, str::FromStr};
 use lazy_static::lazy_static;
-use rainbow_wrapper::rainbow_wrapper;
 
 use crate::number::Number;
 
