@@ -37,7 +37,7 @@ fn main() {
 }
 
 pub fn assemble(rasm_file: String, link_paths: &mut HashSet<String>) {
-    println!("assembling {rasm_file}");
+    println!("assembling {}", rasm_file.replace("\\", "/")); // consistency
 
     let file = rasm_file.split(".rasm").collect::<Vec<&str>>()[0];
     let folder = rasm_file.split(|c| c == '\\' || c == '/').collect::<Vec<&str>>();
