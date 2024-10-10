@@ -26,7 +26,7 @@ fn main() {
         match args[i].as_str() {
             "-l" | "--link" => {
                 i += 1;
-                link_paths.insert(args[i].clone());
+                add_link_path(args[i].clone(), &mut link_paths);
             }
             _ => {}
         }
@@ -43,7 +43,7 @@ pub fn assemble(rasm_file: String, link_paths: &mut HashSet<String>) {
     let folder = rasm_file.split(|c| c == '\\' || c == '/').collect::<Vec<&str>>();
     let folder = folder[0..folder.len()-1].to_vec().join("/") + "/";
 
-    link_paths.insert(folder);
+    add_link_path(folder, link_paths);
 
     let contents = fs::read_to_string(file.to_string() + ".rasm").expect("failed to read file");
 
@@ -69,4 +69,13 @@ pub fn assemble(rasm_file: String, link_paths: &mut HashSet<String>) {
 
     let mut file = fs::OpenOptions::new().create_new(true).write(true).open(rbb_file).expect("failed to open file to save");
     let _ = file.write_all(&bytes);
+}
+
+// this function shouldnt need to exist
+fn add_link_path(mut folder: String, link_paths: &mut HashSet<String>) {
+    folder = folder.replace("\\", "/");
+    if folder.ends_with("/") {
+        folder = folder[..folder.len()-1].to_string();
+    }
+    link_paths.insert(folder);
 }
