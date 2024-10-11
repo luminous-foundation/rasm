@@ -50,39 +50,9 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
     // pre-processing
     let mut labels: HashMap<String, usize> = HashMap::new();
 
-    let mut instr = 0;
-
     // labels
-    while i < tokens.len() {
-        let line = &tokens[i];
+    parse_labels(&tokens, &mut labels, &mut 0);
 
-        if line.len() > 0 {
-            match &line[0] {
-                Token::IDENT(s) => {
-                    if INSTR_MAP.contains_key(s.as_str()) {
-                        instr += 1;
-                    }
-                }
-                Token::COLON => {
-                    match &line[1] {
-                        Token::IDENT(s) => {
-                            if labels.contains_key(s) {
-                                panic!("redefined label {s}");
-                            } else {
-                                labels.insert(s.to_string(), instr);
-                            }
-                        }
-                        _ => panic!("unexpected token {:?}", line[1])
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        i += 1;
-    }
-
-    i = 0;
     while i < tokens.len() {
         let mut j = 0;
         while j < tokens[i].len() {
@@ -103,6 +73,10 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
             }
 
             j += 1;
+
+            if i >= tokens.len() {
+                break;
+            }
         }
 
         i += 1;
@@ -158,20 +132,9 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
 
                     match &line[1] {
                         Token::IDENT(_) => {
-                            let mut end = i;
-                            loop {
-                                if tokens[end].len() > 0 {
-                                    if &tokens[end][0] == &Token::RCURLY {
-                                        break;
-                                    }
-                                }
+                            let body = parse_block(&tokens, &mut i);
 
-                                end += 1;
-                            }
-
-                            res.push(parse_function(tokens[i..end].to_vec(), wrapper, link_paths));
-
-                            i = end;
+                            res.push(parse_function(body, wrapper, link_paths));
                         }
                         _ => panic!("unexpected token {:?}", line[1])
                     }
@@ -299,6 +262,11 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                         _ => panic!("unexpected token {:?}", line[1])
                     }
                 }
+                Token::LCURLY => {
+                    let body = parse_block(&tokens, &mut i);
+
+                    res.push(Expr::SCOPE(parse(body, wrapper, link_paths)));
+                }
                 _ => {
                     todo!("unhandled token {:?}", line[0])
                 }
@@ -310,6 +278,77 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
         // }
 
         i += 1;
+    }
+
+    // println!("{res:#?}");
+
+    return res;
+}
+
+fn parse_labels(tokens: &Vec<Vec<Token>>, labels: &mut HashMap<String, usize>, i: &mut usize) {
+    let mut instr = 0;
+
+    while *i < tokens.len() {
+        let line = &tokens[*i];
+
+        if line.len() > 0 {
+            match &line[0] {
+                Token::IDENT(s) => {
+                    if INSTR_MAP.contains_key(s.as_str()) {
+                        instr += 1;
+                    }
+                }
+                Token::COLON => {
+                    match &line[1] {
+                        Token::IDENT(s) => {
+                            if labels.contains_key(s) {
+                                panic!("redefined label {s}");
+                            } else {
+                                labels.insert(s.to_string(), instr);
+                            }
+                        }
+                        _ => panic!("unexpected token {:?}", line[1])
+                    }
+                }
+                Token::LCURLY => {
+                    *i += 1;
+                    instr += 1;
+                    parse_labels(tokens, labels, i);
+                }
+                Token::RCURLY => {
+                    *i += 1;
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        *i += 1;
+    }
+}
+
+fn parse_block(tokens: &Vec<Vec<Token>>, i: &mut usize) -> Vec<Vec<Token>> {
+    let mut res: Vec<Vec<Token>> = Vec::new();
+
+    *i += 1;
+
+    while *i < tokens.len() {
+        if tokens[*i].len() > 0 {
+            match tokens[*i][0] {
+                Token::LCURLY => {
+                    res.push(vec![Token::LCURLY]);
+                    res.append(&mut parse_block(tokens, i));
+                    res.push(vec![Token::RCURLY]);
+                }
+                Token::RCURLY => {
+                    // *i += 1;
+                    break;
+                }
+                _ => res.push(tokens[*i].clone())
+            }
+        }
+
+        *i += 1;
     }
 
     return res;

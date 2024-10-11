@@ -12,6 +12,7 @@ pub enum Expr {
     ELSEIF_BLOCK(String, String, String, Vec<Expr>),
     ELSE_BLOCK(Vec<Expr>),
     END_BLOCK,
+    SCOPE(Vec<Expr>),
 }
 
 impl Expr {
@@ -118,6 +119,19 @@ impl Expr {
             }
             Expr::END_BLOCK => {
                 end_block!()
+            }
+            Expr::SCOPE(body) => {
+                let mut body_bytes: Vec<u8> = Vec::new();
+
+                body_bytes.push(0xFE);
+
+                for expr in body {
+                    body_bytes.append(&mut expr.to_bytes());
+                }
+
+                body_bytes.push(0xFD);
+
+                body_bytes
             }
         }
     }
