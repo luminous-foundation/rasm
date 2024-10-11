@@ -146,6 +146,8 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
 
                     match &line[1] {
                         Token::IDENT(s) => {
+                            println!("{s}");
+
                             match s.to_lowercase().as_str() {
                                 "include" => {
                                     match &line[2] {
@@ -238,7 +240,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                     let end = get_block_body(&tokens, i);
 
                                     let body = parse(tokens[i+1..end].to_vec(), wrapper, link_paths);
-                                    i = end;
+                                    i = end - 1;
 
                                     match s.to_lowercase().as_str() {
                                         "if" => res.push(Expr::IF_BLOCK(left, cond, right, body)),
@@ -250,6 +252,8 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                     let end = get_block_body(&tokens, i);
 
                                     let body = parse(tokens[i+1..end].to_vec(), wrapper, link_paths);
+
+                                    i = end - 1;
 
                                     res.push(Expr::ELSE_BLOCK(body));
                                 }
@@ -280,7 +284,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
         i += 1;
     }
 
-    // println!("{res:#?}");
+    println!("{res:#?}");
 
     return res;
 }
