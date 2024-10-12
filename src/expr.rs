@@ -1,5 +1,5 @@
-use ::rainbow_wrapper::functions::{generate_function, Arg};
-use ::rainbow_wrapper::*;
+use rainbow_wrapper::functions::{generate_function, Arg};
+use rainbow_wrapper::*;
 
 use crate::instruction::Instruction;
 
@@ -79,6 +79,25 @@ impl Expr {
                     }
                     
                     Instruction::CALLC => callc!(args[0].clone(), args[1].clone(), args[2].clone()),
+                    
+                    Instruction::CMP => {
+                        let cond = match &args[0] {
+                            Value::NAME(n) => {
+                                match n.as_str() {
+                                    "==" => 0,
+                                    "!=" => 1,
+                                    ">=" => 2,
+                                    ">" => 3,
+                                    "<=" => 4,
+                                    "<" => 5,
+                                    _ => panic!("invalid condition {n} passed to `cmp`")
+                                }
+                            },
+                            _ => panic!("unexpected `{}` in `cmp` args", args[0])
+                        };
+
+                        cmp!(Value::UNSIGNED(cond), args[1].clone(), args[2].clone(), args[3].clone())
+                    }
                 }
             }
             Expr::FUNCDEF(name, args, return_type, body) => {

@@ -40,6 +40,7 @@ lazy_static! {
         m.insert("ALLOC", Instruction::ALLOC);
         m.insert("FREE", Instruction::FREE);
         m.insert("CALLC", Instruction::CALLC);
+        m.insert("CMP", Instruction::CMP);
         m
     };
 }
@@ -284,7 +285,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
         i += 1;
     }
 
-    println!("{res:#?}");
+    // println!("{res:#?}");
 
     return res;
 }

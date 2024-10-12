@@ -32,5 +32,6 @@ pub enum Instruction {
     PMOV,
     ALLOC,
     FREE,
-    CALLC
+    CALLC,
+    CMP,
 }
