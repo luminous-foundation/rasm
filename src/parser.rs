@@ -133,7 +133,9 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
 
                     match &line[1] {
                         Token::IDENT(_) => {
-                            let body = parse_block(&tokens, &mut i);
+                            let mut body = vec![line.clone()];
+
+                            body.append(&mut parse_block(&tokens, &mut i));
 
                             res.push(parse_function(body, wrapper, link_paths));
                         }
@@ -147,7 +149,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
 
                     match &line[1] {
                         Token::IDENT(s) => {
-                            println!("{s}");
+                            // println!("{s}");
 
                             match s.to_lowercase().as_str() {
                                 "include" => {
