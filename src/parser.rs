@@ -2,7 +2,7 @@ use std::{collections::{HashMap, HashSet}, fs, path::Path};
 
 use crate::{assemble, expr::Expr, instruction::Instruction, number::Number, tokenizer::{self, Token}};
 use lazy_static::lazy_static;
-use rainbow_wrapper::{ident, immediate, name, r#extern::Extern, functions::Arg, types::{Type, Value}, wrapper::Wrapper};
+use rainbow_wrapper::{ident, immediate, name, r#extern::Extern, generation::Arg, types::{Type, Value}, wrapper::Wrapper};
 
 lazy_static! {
     static ref INSTR_MAP: HashMap<&'static str, Instruction> = {
@@ -155,7 +155,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                 "include" => {
                                     match &line[2] {
                                         Token::IDENT(s) => {
-                                            wrapper.push_import(&(s.clone() + ".rbb"));
+                                            res.push(Expr::IMPORT(s.clone() + ".rbb"));
                                         }
                                         Token::STRING(s) => {
                                             if s.ends_with(".rasm") {
@@ -184,7 +184,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                                     assemble(import_path, link_paths);
                                                 }
 
-                                                wrapper.push_import(&(s.split(".").next().unwrap().to_string() + ".rbb"));
+                                                res.push(Expr::IMPORT(s.split(".").next().unwrap().to_string() + ".rbb"));
                                             } else if s.ends_with(".rbb") {
                                                 wrapper.push_import(s);
                                             } else {
@@ -222,7 +222,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                         _ => panic!("unexpected token {:?}", line[index + 2])
                                     }.clone();
 
-                                    wrapper.push_extern(Extern { ret_type, name, arg_types, file });
+                                    res.push(Expr::EXTERN(Extern { ret_type, name, arg_types, file }));
                                 }
                                 "if" | "elseif" => {
                                     let left = match &line[2] {
@@ -262,6 +262,19 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                 }
                                 "end" => {
                                     res.push(Expr::END_BLOCK);
+                                }
+                                "module" => {
+                                    let name = match &line[2] {
+                                        Token::IDENT(n) => n,
+                                        _ => panic!("unexpected token {:?}", line[2])
+                                    }.clone();
+
+                                    let end = get_block_body(&tokens, i);
+
+                                    let body = parse(tokens[i+1..end-1].to_vec(), wrapper, link_paths);
+                                    i = end;
+
+                                    res.push(Expr::MODULE(name, body));
                                 }
                                 _ => panic!("unexpected token {:?}", line[1])
                             }

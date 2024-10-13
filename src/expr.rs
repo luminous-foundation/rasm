@@ -1,4 +1,6 @@
-use rainbow_wrapper::functions::{generate_function, Arg};
+use r#extern::Extern;
+use generation::{generate_extern, generate_module, generate_scope};
+use rainbow_wrapper::generation::{generate_function, Arg, generate_import};
 use rainbow_wrapper::*;
 
 use crate::instruction::Instruction;
@@ -13,6 +15,9 @@ pub enum Expr {
     ELSE_BLOCK(Vec<Expr>),
     END_BLOCK,
     SCOPE(Vec<Expr>),
+    IMPORT(String),
+    MODULE(String, Vec<Expr>),
+    EXTERN(Extern),
 }
 
 impl Expr {
@@ -142,15 +147,26 @@ impl Expr {
             Expr::SCOPE(body) => {
                 let mut body_bytes: Vec<u8> = Vec::new();
 
-                body_bytes.push(0xFE);
+                for expr in body {
+                    body_bytes.append(&mut expr.to_bytes());
+                }
+
+                generate_scope(&body_bytes)
+            }
+            Expr::IMPORT(import) => {
+                generate_import(import)
+            }
+            Expr::MODULE(name, body) => {
+                let mut body_bytes: Vec<u8> = Vec::new();
 
                 for expr in body {
                     body_bytes.append(&mut expr.to_bytes());
                 }
 
-                body_bytes.push(0xFD);
-
-                body_bytes
+                generate_module(name, &body_bytes)
+            }
+            Expr::EXTERN(ext) => {
+                generate_extern(ext)
             }
         }
     }
