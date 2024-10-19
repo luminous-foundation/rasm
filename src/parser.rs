@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, fs, path::Path};
 
-use crate::{assemble, expr::Expr, instruction::Instruction, number::Number, tokenizer::{self, Token}};
+use crate::{assemble, expr::Expr, instruction::Instruction, number::Number, r#struct::Struct, tokenizer::{self, Token}};
 use lazy_static::lazy_static;
 use rainbow_wrapper::{ident, immediate, name, r#extern::Extern, generation::Arg, types::{Type, Value}, wrapper::Wrapper};
 
@@ -53,6 +53,55 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
 
     // labels
     parse_labels(&tokens, &mut labels, &mut 0);
+
+    for line in &mut tokens {
+        if line.len() > 2 {
+            let mut i = 0;
+            
+            while i < line.len() - 2 {
+                let line2 = line.clone();
+                match &line2[i] {
+                    Token::IDENT(l) => {
+                        match &line2[i + 1] {
+                            Token::DOT => {
+                                match &line2[i + 2] {
+                                    Token::IDENT(r) => {
+                                        line.remove(i);
+                                        line.remove(i);
+                                        line.remove(i);
+
+                                        line.insert(i, Token::IDENT(l.to_owned() + "." + r));
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    Token::VAR(l) => {
+                        match &line2[i + 1] {
+                            Token::DOT => {
+                                match &line2[i + 2] {
+                                    Token::IDENT(r) => {
+                                        line.remove(i);
+                                        line.remove(i);
+                                        line.remove(i);
+
+                                        line.insert(i, Token::VAR(l.to_owned() + "." + r));
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+
+                i += 1;
+            }
+        }
+    }
 
     while i < tokens.len() {
         let mut j = 0;
@@ -160,22 +209,21 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                         Token::STRING(s) => {
                                             if s.ends_with(".rasm") {
                                                 let mut import_path = String::new();
-                                                for path in link_paths.clone() {
-                                                    let paths = match fs::read_dir(path) {
-                                                        Ok(p) => p,
-                                                        Err(e) => panic!("{}", e.to_string()),
-                                                    };
+                                                if Path::exists(Path::new(&s)) {
+                                                    import_path = s.clone();
+                                                }
 
-                                                    for path in paths {
-                                                        let dir_entry = path.unwrap();
-                                                        let path = &dir_entry.path();
-                                                        let path_str = path.as_os_str().to_str().unwrap();
-                                                        if path_str.ends_with(s) {
-                                                            if import_path == "" {
-                                                                import_path = path_str.to_owned();
-                                                            } else {
-                                                                panic!("ambiguous import {s}");
-                                                            }
+                                                let mut paths = HashSet::new();
+                                                for path in link_paths.clone() {
+                                                    paths.extend(get_paths(&path));
+                                                }
+                                                
+                                                for path in paths {
+                                                    if path.ends_with(s) {
+                                                        if import_path == "" {
+                                                            import_path = path;
+                                                        } else {
+                                                            panic!("ambiguous import {s}\n({import_path} and {path})");
                                                         }
                                                     }
                                                 }
@@ -279,6 +327,26 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                 _ => panic!("unexpected token {:?}", line[1])
                             }
                         }
+                        Token::TYPE(t) => { // because the tokenizer felt like it
+                            match t[0] {
+                                tokenizer::Type::STRUCT => {
+                                    let start = i;
+
+                                    while i < tokens.len() {
+                                        if tokens[i].len() > 0 {
+                                            if tokens[i][0] == Token::RCURLY {
+                                                break;
+                                            }
+                                        }
+
+                                        i += 1;
+                                    }
+
+                                    res.push(parse_struct(tokens[start..i].to_vec()));
+                                }
+                                _ => panic!("unexpected token {:?}", line[1])
+                            }
+                        }
                         _ => panic!("unexpected token {:?}", line[1])
                     }
                 }
@@ -305,6 +373,69 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
     return res;
 }
 
+fn parse_struct(tokens: Vec<Vec<Token>>) -> Expr {
+    let name = match &tokens[0][2] {
+        Token::IDENT(s) => s,
+        _ => panic!("unexpected token {:?}", tokens[0][2])
+    }.clone();
+
+    let mut types: Vec<Vec<tokenizer::Type>> = Vec::new();
+    let mut names: Vec<String> = Vec::new();
+
+    let mut i = 1;
+    loop {
+        match &tokens[i][0] {
+            Token::TYPE(t) => types.push(t.to_vec()),
+            _ => panic!("unexpected token {:?}", tokens[i][0])
+        }
+        match &tokens[i][1] {
+            Token::IDENT(n) => names.push(n.clone()),
+            _ => panic!("unexpected token {:?}", tokens[i][1])
+        }
+
+        i += 1;
+
+        if i >= tokens.len() {
+            break;
+        }
+
+        if tokens[i][0] == Token::RCURLY {
+            break;
+        }
+    }
+
+    return Expr::STRUCT(Struct { name, types, names })
+}
+
+fn get_paths(path: &String) -> HashSet<String> {
+    let mut path_queue: Vec<String> = Vec::new();
+    let mut res = HashSet::new();
+    
+    path_queue.push(path.to_string());
+
+    while path_queue.len() > 0 {
+        let path = path_queue.remove(0);
+        let paths = match fs::read_dir(path.clone()) {
+            Ok(p) => p,
+            Err(e) => panic!("{}", e.to_string()),
+        };
+
+        for path in paths {
+            let dir_entry = path.unwrap();
+
+            let path = dir_entry.path().as_os_str().to_str().unwrap().to_string();
+
+            if dir_entry.metadata().unwrap().is_dir() {
+                path_queue.push(path);
+            } else if dir_entry.metadata().unwrap().is_file() {
+                res.insert(path.replace("\\", "/"));
+            }
+        }
+    }
+
+    return res;
+}
+
 fn parse_labels(tokens: &Vec<Vec<Token>>, labels: &mut HashMap<String, usize>, i: &mut usize) {
     let mut instr = 0;
 
@@ -312,6 +443,13 @@ fn parse_labels(tokens: &Vec<Vec<Token>>, labels: &mut HashMap<String, usize>, i
         let line = &tokens[*i];
 
         if line.len() > 0 {
+            if line.contains(&Token::LCURLY) {
+                *i += 1;
+                instr += 1;
+                parse_labels(tokens, labels, i);
+                continue;
+            }
+
             match &line[0] {
                 Token::IDENT(s) => {
                     if INSTR_MAP.contains_key(s.as_str()) {
@@ -329,11 +467,6 @@ fn parse_labels(tokens: &Vec<Vec<Token>>, labels: &mut HashMap<String, usize>, i
                         }
                         _ => panic!("unexpected token {:?}", line[1])
                     }
-                }
-                Token::LCURLY => {
-                    *i += 1;
-                    instr += 1;
-                    parse_labels(tokens, labels, i);
                 }
                 Token::RCURLY => {
                     *i += 1;

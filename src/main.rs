@@ -9,6 +9,7 @@ mod number;
 mod parser;
 mod expr;
 mod instruction;
+mod r#struct;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

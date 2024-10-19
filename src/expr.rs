@@ -1,9 +1,11 @@
 use r#extern::Extern;
-use generation::{generate_extern, generate_module, generate_scope};
+use generation::{generate_extern, generate_module, generate_scope, generate_struct};
 use rainbow_wrapper::generation::{generate_function, Arg, generate_import};
 use rainbow_wrapper::*;
 
 use crate::instruction::Instruction;
+use crate::parser::to_rb_type;
+use crate::r#struct::Struct;
 
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
@@ -18,6 +20,7 @@ pub enum Expr {
     IMPORT(String),
     MODULE(String, Vec<Expr>),
     EXTERN(Extern),
+    STRUCT(Struct),
 }
 
 impl Expr {
@@ -66,7 +69,7 @@ impl Expr {
                         }
                     }
                     
-                    Instruction::DEREF => deref!(args[0].clone(), args[1].clone()),
+                    Instruction::DEREF => rainbow_wrapper::deref!(args[0].clone(), args[1].clone()),
                     Instruction::REF   => r#ref!(args[0].clone(), args[1].clone()),
                     
                     Instruction::INST  => inst! (args[0].clone(), args[1].clone()),
@@ -167,6 +170,17 @@ impl Expr {
             }
             Expr::EXTERN(ext) => {
                 generate_extern(ext)
+            }
+            Expr::STRUCT(strct) => {
+                let mut types: Vec<Vec<Type>> = Vec::new();
+
+                for typ in &strct.types {
+                    types.push(to_rb_type(typ.to_vec()));
+                }
+
+                let wrap_struct: rainbow_wrapper::r#struct::Struct = rainbow_wrapper::r#struct::Struct { name: strct.name.clone(), types, names: strct.names.clone() };
+
+                generate_struct(wrap_struct)
             }
         }
     }
