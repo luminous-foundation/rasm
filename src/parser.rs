@@ -494,7 +494,7 @@ fn parse_block(tokens: &Vec<Vec<Token>>, i: &mut usize) -> Vec<Vec<Token>> {
                     res.push(vec![Token::RCURLY]);
                 }
                 Token::RCURLY => {
-                    // *i += 1;
+                    *i += 1;
                     break;
                 }
                 _ => res.push(tokens[*i].clone())
