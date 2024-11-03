@@ -225,6 +225,8 @@ pub fn tokenize(line: String) -> Vec<Token> {
                     tokens.push(Token::STRING(cur_token));
 
                     cur_token = String::from("");
+
+                    in_str = false;
                 }
                 _ => cur_token.push(c)
             }

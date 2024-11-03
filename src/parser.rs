@@ -269,8 +269,20 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                         Token::STRING(s) => s,
                                         _ => panic!("unexpected token {:?}", line[index + 2])
                                     }.clone();
+                                    index += 2;
 
-                                    res.push(Expr::EXTERN(Extern { ret_type, name, arg_types, file }));
+                                    let access_name;
+
+                                    if index < line.len() {
+                                        access_name = match &line[index + 2] {
+                                            Token::IDENT(s) => s,
+                                            _ => panic!("unexpected token {:?}", line[index + 2])
+                                        }.clone();
+                                    } else {
+                                        access_name = name.clone();
+                                    }
+
+                                    res.push(Expr::EXTERN(Extern { ret_type, name, access_name, arg_types, file }));
                                 }
                                 "if" | "elseif" => {
                                     let left = match &line[2] {

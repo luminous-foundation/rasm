@@ -1,3 +1,5 @@
+# this is so outdated
+
 # RAINBOW ASSEMBLY (RASM) SPECIFICATION
 
 ## INSTRUCTIONS
@@ -121,6 +123,7 @@ void baz() { ; this creates an infinite loop
 
 ## MACROS
 todo: add description of macros
+TODO READD MACROS
 The format is as follows
 ```
 .macro (name) (args) {
