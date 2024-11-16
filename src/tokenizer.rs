@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 
 use crate::number::Number;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
     VOID,
     I8,
@@ -19,7 +19,7 @@ pub enum Type {
     F64,
     POINTER,
     TYPE,
-    STRUCT,
+    STRUCT(String), // optional type def
     NAME,
 }
 
@@ -40,7 +40,7 @@ impl Type {
             Type::F64 => rainbow_wrapper::types::Type::F64,
             Type::POINTER => rainbow_wrapper::types::Type::POINTER,
             Type::TYPE => rainbow_wrapper::types::Type::TYPE,
-            Type::STRUCT => rainbow_wrapper::types::Type::STRUCT,
+            Type::STRUCT(typ) => rainbow_wrapper::types::Type::STRUCT(typ.to_string()),
             Type::NAME => rainbow_wrapper::types::Type::NAME,
         }
     }
@@ -64,7 +64,7 @@ lazy_static! {
         m.insert("F64", Type::F64);
         m.insert("*", Type::POINTER);
         m.insert("TYPE", Type::TYPE);
-        m.insert("STRUCT", Type::STRUCT);
+        m.insert("STRUCT", Type::STRUCT(String::new()));
         m.insert("NAME", Type::NAME);
         m.insert("FUNCPTR", Type::NAME);
         m
@@ -95,7 +95,7 @@ pub enum Token {
 macro_rules! push_type {
     ($tokens:expr, $cur_token:expr, $temp_type:expr, $in_type:expr) => {
         if is_type(&$cur_token) {
-            $temp_type.push(*TYPE_MAP.get(&$cur_token.to_uppercase()[..]).unwrap());
+            $temp_type.push(TYPE_MAP.get(&$cur_token.to_uppercase()[..]).unwrap().clone());
             $cur_token = String::from("");
             $in_type = true;
         } else if $in_type {
@@ -235,7 +235,7 @@ pub fn tokenize(line: String) -> Vec<Token> {
 
     // inlined to remove warnings
     if is_type(&cur_token){
-        temp_type.push(*TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap());
+        temp_type.push(TYPE_MAP.get(&cur_token.to_uppercase()[..]).unwrap().clone());
         cur_token = String::from("");
     } else if in_type {
         temp_type.reverse();

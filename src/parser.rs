@@ -103,6 +103,50 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
         }
     }
 
+    for line in &mut tokens {
+        let mut i = 0;
+        while i < line.len() {
+            let line2 = line.clone();
+            match &line2[i] {
+                Token::DOT => {
+                    i += 2;
+                    continue;
+                }
+                Token::TYPE(typ) => {
+                    let mut j = 0;
+                    while j < typ.len() {
+                        let t = &typ[j];
+                        match t {
+                            tokenizer::Type::STRUCT(s) => {
+                                if s.len() == 0 {
+                                    let struct_type = match &line[i+1] {
+                                        Token::IDENT(s) => s,
+                                        _ => panic!("unexpected token {:?}", line[i+1])
+                                    };
+
+                                    let mut new_typ = typ.clone();
+
+                                    new_typ.remove(j);
+
+                                    new_typ.insert(j, tokenizer::Type::STRUCT(struct_type.clone()));
+
+                                    let new_tok = Token::TYPE(new_typ);
+                                    line.remove(i);
+                                    line.remove(i);
+                                    line.insert(i, new_tok);
+                                }
+                            }
+                            _ => {}
+                        }
+                        j += 1;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+
     while i < tokens.len() {
         let mut j = 0;
         while j < tokens[i].len() {
@@ -135,6 +179,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
     // processing
     let mut res: Vec<Expr> = Vec::new();
     i = 0;
+
     while i < tokens.len() {
         let line = &tokens[i];
 
@@ -164,7 +209,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                                 Token::STRING(s) => {
                                     wrapper.push_string(&s);
 
-                                    Value::IDENT(s)
+                                    Value::IDENT(Wrapper::get_string_name(&s))
                                 }
                                 _ => panic!("unexpected token {arg:?}")
                             });
@@ -179,7 +224,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                     if line.len() < 2 {
                         panic!("unexpected token {:?}", line[0]);
                     }
-
+                    
                     match &line[1] {
                         Token::IDENT(_) => {
                             let mut body = vec![line.clone()];
@@ -273,7 +318,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
 
                                     let access_name;
 
-                                    if index < line.len() {
+                                    if index < line.len() - 1 {
                                         access_name = match &line[index + 2] {
                                             Token::IDENT(s) => s,
                                             _ => panic!("unexpected token {:?}", line[index + 2])
@@ -341,7 +386,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
                         }
                         Token::TYPE(t) => { // because the tokenizer felt like it
                             match t[0] {
-                                tokenizer::Type::STRUCT => {
+                                tokenizer::Type::STRUCT(_) => {
                                     let start = i;
 
                                     while i < tokens.len() {
@@ -367,6 +412,7 @@ pub fn parse(mut tokens: Vec<Vec<Token>>, wrapper: &mut Wrapper, link_paths: &mu
 
                     res.push(Expr::SCOPE(parse(body, wrapper, link_paths)));
                 }
+                Token::RCURLY => {} // TODO: why does this create an error
                 _ => {
                     todo!("unhandled token {:?}", line[0])
                 }

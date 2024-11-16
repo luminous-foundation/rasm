@@ -56,6 +56,8 @@ pub fn assemble(rasm_file: String, link_paths: &mut HashSet<String>) {
         tokens.push(line);
     }
 
+    // println!("{:#?}", tokens);
+
     let mut wrapper = Wrapper::new();
 
     let program = emit(&parse(tokens, &mut wrapper, link_paths));
