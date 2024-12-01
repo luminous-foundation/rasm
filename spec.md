@@ -94,20 +94,20 @@ The format is as follows
 ```
 An example function is
 ```c
-void foo() {
-    LDARG str_1
-    CALL io_print
-}
+.include "io.rasm"
 
-.data
-str_1 char* "Hello, World!"
+void foo() {
+    PUSH "Hello, World!"
+    PUSH 13
+    CALL io.println
+}
 ```
 An example function with arguments is
 ```c
 void bar(i32 x u64 y) {
-    LDARG x
+    PUSH x
     CALL io_print
-    LDARG y
+    PUSH y
     CALL io_print
 }
 ```
@@ -122,21 +122,23 @@ void baz() { ; this creates an infinite loop
 ```
 
 ## MACROS
-todo: add description of macros
 TODO READD MACROS
-The format is as follows
-```
-.macro (name) (args) {
-    (code)
-}
-```
-An example macro is as follows
-```
-.macro CALL1ARG func a {
-    LDARG a
-    CALL func
-}
-```
+
+~~todo: add description of macros~~
+~~The format is as follows~~
+~~```~~
+~~.macro (name) (args) {~~
+~~    (code)~~
+~~}~~
+~~```~~
+~~An example macro is as follows~~
+~~```~~
+~~.macro CALL1ARG func a {~~
+~~\    LDARG a~~
+~~\    CALL func~~
+~~}~~
+~~```~~
+~~
 
 ## IMPORTING
 You can import other files to use functions and macros from them.
