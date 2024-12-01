@@ -6,3 +6,5 @@ void main() {
     PUSH 13
     CALL io_println
 }
+
+CALL main
