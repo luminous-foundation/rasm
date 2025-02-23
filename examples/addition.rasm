@@ -1,4 +1,0 @@
-VAR i16 a
-ADD 1 2 $a
-
-RET $a
